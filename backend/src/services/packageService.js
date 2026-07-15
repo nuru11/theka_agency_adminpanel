@@ -1,255 +1,155 @@
-const { Op } = require('sequelize');
 const {
-  sequelize,
   TourPackage,
-  PackageItem,
-  Payment,
+  PackageDay,
   Tourist,
-  User,
   Property,
-  Activity,
   Park,
-  PackageLog,
+  User,
+  sequelize,
 } = require('../models');
 const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
 
-async function normalizePackageItems(items) {
-  if (!items?.length) return items;
+function computeExpectedCost(accommodationPrice, days) {
+  const parksTotal = (days || []).reduce((sum, d) => sum + Number(d.park_price || 0), 0);
+  return Number(accommodationPrice || 0) + parksTotal;
+}
 
-  const accommodationIds = items
-    .filter((item) => item.item_type === 'accommodation')
-    .map((item) => Number(item.property_id));
-
-  const activityIds = items
-    .filter((item) => item.item_type === 'activity')
-    .map((item) => Number(item.activity_id));
-
-  const seenAccommodations = new Set();
-  for (const id of accommodationIds) {
-    if (!id) {
-      throw new AppError('PROPERTY_ID_REQUIRED', ERROR_CODES.PROPERTY_ID_REQUIRED, 400);
-    }
-    if (seenAccommodations.has(id)) {
-      throw new AppError('DUPLICATE_ACCOMMODATION', ERROR_CODES.DUPLICATE_ACCOMMODATION, 400);
-    }
-    seenAccommodations.add(id);
+function validateDays(daysCount, days) {
+  if (!Array.isArray(days) || days.length !== Number(daysCount)) {
+    throw new AppError('INVALID_PACKAGE_DAYS', ERROR_CODES.INVALID_PACKAGE_DAYS, 400);
   }
-
-  const seenActivities = new Set();
-  for (const id of activityIds) {
-    if (!id) {
-      throw new AppError('ACTIVITY_ID_REQUIRED', ERROR_CODES.ACTIVITY_ID_REQUIRED, 400);
+  const numbers = days.map((d) => Number(d.day_number)).sort((a, b) => a - b);
+  for (let i = 0; i < daysCount; i += 1) {
+    if (numbers[i] !== i + 1) {
+      throw new AppError('INVALID_PACKAGE_DAYS', ERROR_CODES.INVALID_PACKAGE_DAYS, 400);
     }
-    if (seenActivities.has(id)) {
-      throw new AppError('DUPLICATE_ACTIVITY', ERROR_CODES.DUPLICATE_ACTIVITY, 400);
-    }
-    seenActivities.add(id);
   }
+}
 
-  const properties =
-    accommodationIds.length > 0
-      ? await Property.findAll({ where: { id: accommodationIds } })
-      : [];
-  const propertyMap = new Map(properties.map((p) => [p.id, p]));
+async function assertTourist(id) {
+  const tourist = await Tourist.findByPk(id);
+  if (!tourist) throw new AppError('TOURIST_NOT_FOUND', ERROR_CODES.TOURIST_NOT_FOUND, 404);
+  return tourist;
+}
 
-  const activities =
-    activityIds.length > 0
-      ? await Activity.findAll({ where: { id: activityIds } })
-      : [];
-  const activityMap = new Map(activities.map((a) => [a.id, a]));
+async function assertProperty(id) {
+  const property = await Property.findByPk(id);
+  if (!property) throw new AppError('PROPERTY_NOT_FOUND', ERROR_CODES.PROPERTY_NOT_FOUND, 404);
+  if (property.status === 'inactive') {
+    throw new AppError('PROPERTY_INACTIVE', ERROR_CODES.PROPERTY_INACTIVE, 400);
+  }
+  return property;
+}
 
-  return items.map((item) => {
-    if (item.item_type === 'accommodation') {
-      const property = propertyMap.get(Number(item.property_id));
-      if (!property) {
-        throw new AppError('PROPERTY_NOT_FOUND', ERROR_CODES.PROPERTY_NOT_FOUND, 404);
-      }
-      if (property.status !== 'active') {
-        throw new AppError('PROPERTY_INACTIVE', ERROR_CODES.PROPERTY_INACTIVE, 400);
-      }
-      return {
-        ...item,
-        price: item.price != null ? item.price : property.price_per_night,
-      };
-    }
+async function assertPark(id) {
+  const park = await Park.findByPk(id);
+  if (!park) throw new AppError('PARK_NOT_FOUND', ERROR_CODES.PARK_NOT_FOUND, 404);
+  if (park.status === 'inactive') {
+    throw new AppError('PARK_INACTIVE', ERROR_CODES.PARK_INACTIVE, 400);
+  }
+  return park;
+}
 
-    if (item.item_type === 'activity') {
-      const activity = activityMap.get(Number(item.activity_id));
-      if (!activity) {
-        throw new AppError('ACTIVITY_NOT_FOUND', ERROR_CODES.ACTIVITY_NOT_FOUND, 404);
-      }
-      if (activity.status !== 'active') {
-        throw new AppError('ACTIVITY_INACTIVE', ERROR_CODES.ACTIVITY_INACTIVE, 400);
-      }
-      return {
-        ...item,
-        price: item.price != null ? item.price : activity.default_price,
-      };
-    }
+async function assertDriver(id) {
+  const driver = await User.findOne({
+    where: { id, role: 'employee', is_driver: true, status: 'active' },
+  });
+  if (!driver) throw new AppError('DRIVER_NOT_FOUND', ERROR_CODES.DRIVER_NOT_FOUND, 404);
+  return driver;
+}
 
-    const { price, ...rest } = item;
-    return rest;
+async function list() {
+  return TourPackage.findAll({
+    include: [
+      { model: Tourist, as: 'tourist', attributes: ['id', 'name'] },
+      { model: Property, as: 'property', attributes: ['id', 'name'] },
+      { model: User, as: 'driver', attributes: ['id', 'name'] },
+      { model: User, as: 'creator', attributes: ['id', 'name'] },
+    ],
+    order: [['created_at', 'DESC']],
   });
 }
 
-const packageIncludes = [
-  { model: Tourist, as: 'tourist' },
-  { model: User, as: 'assignedEmployee', attributes: ['id', 'name', 'is_driver'] },
-  { model: User, as: 'creator', attributes: ['id', 'name'] },
-  {
-    model: PackageItem,
-    as: 'items',
+async function getById(id) {
+  const pkg = await TourPackage.findByPk(id, {
     include: [
-      { model: Property, as: 'property' },
-      { model: Activity, as: 'activity' },
-      { model: Park, as: 'park' },
+      { model: Tourist, as: 'tourist', attributes: ['id', 'name'] },
+      { model: Property, as: 'property', attributes: ['id', 'name', 'price'] },
       { model: User, as: 'driver', attributes: ['id', 'name'] },
+      { model: User, as: 'creator', attributes: ['id', 'name'] },
+      {
+        model: PackageDay,
+        as: 'days',
+        include: [
+          { model: Park, as: 'park', attributes: ['id', 'name', 'price'] },
+          { model: User, as: 'driver', attributes: ['id', 'name'] },
+        ],
+      },
     ],
-  },
-  { model: Payment, as: 'payments' },
-  { model: PackageLog, as: 'logs', include: [{ model: User, as: 'employee', attributes: ['id', 'name'] }] },
-];
-
-async function list(filters = {}) {
-  const where = {};
-  if (filters.status) where.status = filters.status;
-  if (filters.employeeId) where.assigned_employee_id = filters.employeeId;
-  return TourPackage.findAll({ where, include: packageIncludes, order: [['created_at', 'DESC']] });
-}
-
-async function getById(id, transaction) {
-  const pkg = await TourPackage.findByPk(id, { include: packageIncludes, transaction });
+    order: [[{ model: PackageDay, as: 'days' }, 'day_number', 'ASC']],
+  });
   if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
   return pkg;
 }
 
 async function create(data, userId) {
-  return sequelize.transaction(async (t) => {
+  const {
+    tourist_id,
+    people_count,
+    days_count,
+    property_id,
+    accommodation_price,
+    driver_id,
+    vehicle_type,
+    days,
+  } = data;
+
+  validateDays(days_count, days);
+
+  await assertTourist(tourist_id);
+  await assertProperty(property_id);
+  await assertDriver(driver_id);
+
+  for (const day of days) {
+    await assertPark(day.park_id);
+    await assertDriver(day.driver_id);
+  }
+
+  const expected_cost = computeExpectedCost(accommodation_price, days);
+
+  const pkgId = await sequelize.transaction(async (transaction) => {
     const pkg = await TourPackage.create(
       {
-        tourist_id: data.tourist_id,
-        assigned_employee_id: data.assigned_employee_id || null,
-        package_price: data.package_price,
-        people_count: data.people_count,
-        status: data.status || 'draft',
-        notes: data.notes || null,
+        tourist_id,
+        people_count,
+        days_count,
+        property_id,
+        accommodation_price,
+        driver_id,
+        vehicle_type,
+        expected_cost,
+        status: 'active',
         created_by: userId,
       },
-      { transaction: t }
+      { transaction }
     );
 
-    if (data.items?.length) {
-      const normalizedItems = await normalizePackageItems(data.items);
-      await PackageItem.bulkCreate(
-        normalizedItems.map((item) => ({ ...item, package_id: pkg.id })),
-        { transaction: t }
-      );
-    }
-
-    if (data.payments?.length) {
-      await Payment.bulkCreate(
-        data.payments.map((p) => ({
-          ...p,
-          package_id: pkg.id,
-          received_by: userId,
-        })),
-        { transaction: t }
-      );
-    }
-
-    return getById(pkg.id, t);
-  });
-}
-
-async function update(id, data) {
-  const pkg = await TourPackage.findByPk(id);
-  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-
-  return sequelize.transaction(async (t) => {
-    await pkg.update(
-      {
-        tourist_id: data.tourist_id ?? pkg.tourist_id,
-        assigned_employee_id: data.assigned_employee_id ?? pkg.assigned_employee_id,
-        package_price: data.package_price ?? pkg.package_price,
-        people_count: data.people_count ?? pkg.people_count,
-        status: data.status ?? pkg.status,
-        notes: data.notes ?? pkg.notes,
-      },
-      { transaction: t }
+    await PackageDay.bulkCreate(
+      days.map((d) => ({
+        package_id: pkg.id,
+        day_number: d.day_number,
+        park_id: d.park_id,
+        park_price: d.park_price,
+        driver_id: d.driver_id,
+      })),
+      { transaction }
     );
 
-    if (data.items) {
-      await PackageItem.destroy({ where: { package_id: id }, transaction: t });
-      if (data.items.length) {
-        const normalizedItems = await normalizePackageItems(data.items);
-        await PackageItem.bulkCreate(
-          normalizedItems.map((item) => ({ ...item, package_id: id })),
-          { transaction: t }
-        );
-      }
-    }
-
-    if (data.payments) {
-      await Payment.destroy({ where: { package_id: id }, transaction: t });
-      if (data.payments.length) {
-        await Payment.bulkCreate(
-          data.payments.map((p) => ({
-            ...p,
-            package_id: id,
-            received_by: p.received_by || pkg.created_by,
-          })),
-          { transaction: t }
-        );
-      }
-    }
-
-    return getById(id, t);
+    return pkg.id;
   });
+
+  return getById(pkgId);
 }
 
-async function updateStatus(id, status) {
-  const pkg = await TourPackage.findByPk(id);
-  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-  await pkg.update({ status });
-  return getById(id);
-}
-
-async function addLog(packageId, data, employeeId) {
-  const pkg = await TourPackage.findByPk(packageId);
-  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-  if (pkg.assigned_employee_id !== employeeId) {
-    throw new AppError('FORBIDDEN', ERROR_CODES.FORBIDDEN, 403);
-  }
-
-  const log = await PackageLog.create({ ...data, package_id: packageId, employee_id: employeeId });
-  if (pkg.status === 'draft' || pkg.status === 'active') {
-    await pkg.update({ status: 'active' });
-  }
-  return log;
-}
-
-async function listLogs(employeeId) {
-  return PackageLog.findAll({
-    where: { employee_id: employeeId },
-    include: [{ model: TourPackage, as: 'package', include: [{ model: Tourist, as: 'tourist' }] }],
-    order: [['created_at', 'DESC']],
-  });
-}
-
-async function remove(id) {
-  const pkg = await TourPackage.findByPk(id);
-  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-  await pkg.destroy();
-}
-
-module.exports = {
-  list,
-  getById,
-  create,
-  update,
-  updateStatus,
-  addLog,
-  listLogs,
-  remove,
-};
+module.exports = { list, getById, create, computeExpectedCost };

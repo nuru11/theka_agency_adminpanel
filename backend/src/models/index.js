@@ -14,81 +14,69 @@ const sequelize = new Sequelize(
 );
 
 const User = require('./User')(sequelize);
+const Tourist = require('./Tourist')(sequelize);
 const Property = require('./Property')(sequelize);
 const Park = require('./Park')(sequelize);
-const Activity = require('./Activity')(sequelize);
-const Tourist = require('./Tourist')(sequelize);
 const TourPackage = require('./TourPackage')(sequelize);
-const PackageItem = require('./PackageItem')(sequelize);
-const Payment = require('./Payment')(sequelize);
-const PackageLog = require('./PackageLog')(sequelize);
+const PackageDay = require('./PackageDay')(sequelize);
 const Handoff = require('./Handoff')(sequelize);
+const WalletTransaction = require('./WalletTransaction')(sequelize);
 const PackageSpending = require('./PackageSpending')(sequelize);
-const Expense = require('./Expense')(sequelize);
-const SalaryPayment = require('./SalaryPayment')(sequelize);
 
-User.hasMany(Tourist, { foreignKey: 'created_by', as: 'touristsCreated' });
-Tourist.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+Tourist.belongsTo(User, { as: 'creator', foreignKey: 'created_by' });
+User.hasMany(Tourist, { as: 'tourists', foreignKey: 'created_by' });
 
-Tourist.hasMany(TourPackage, { foreignKey: 'tourist_id', as: 'packages' });
-TourPackage.belongsTo(Tourist, { foreignKey: 'tourist_id', as: 'tourist' });
+TourPackage.belongsTo(Tourist, { as: 'tourist', foreignKey: 'tourist_id' });
+Tourist.hasMany(TourPackage, { as: 'packages', foreignKey: 'tourist_id' });
 
-User.hasMany(TourPackage, { foreignKey: 'assigned_employee_id', as: 'assignedPackages' });
-TourPackage.belongsTo(User, { foreignKey: 'assigned_employee_id', as: 'assignedEmployee' });
+TourPackage.belongsTo(Property, { as: 'property', foreignKey: 'property_id' });
+Property.hasMany(TourPackage, { as: 'packages', foreignKey: 'property_id' });
 
-User.hasMany(TourPackage, { foreignKey: 'created_by', as: 'packagesCreated' });
-TourPackage.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+TourPackage.belongsTo(User, { as: 'driver', foreignKey: 'driver_id' });
+TourPackage.belongsTo(User, { as: 'creator', foreignKey: 'created_by' });
 
-TourPackage.hasMany(PackageItem, { foreignKey: 'package_id', as: 'items' });
-PackageItem.belongsTo(TourPackage, { foreignKey: 'package_id', as: 'package' });
-PackageItem.belongsTo(Property, { foreignKey: 'property_id', as: 'property' });
-PackageItem.belongsTo(Activity, { foreignKey: 'activity_id', as: 'activity' });
-PackageItem.belongsTo(Park, { foreignKey: 'park_id', as: 'park' });
-PackageItem.belongsTo(User, { foreignKey: 'driver_id', as: 'driver' });
+TourPackage.hasMany(PackageDay, { as: 'days', foreignKey: 'package_id' });
+PackageDay.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });
 
-TourPackage.hasMany(Payment, { foreignKey: 'package_id', as: 'payments' });
-Payment.belongsTo(TourPackage, { foreignKey: 'package_id', as: 'package' });
-Payment.belongsTo(User, { foreignKey: 'received_by', as: 'receiver' });
+PackageDay.belongsTo(Park, { as: 'park', foreignKey: 'park_id' });
+PackageDay.belongsTo(User, { as: 'driver', foreignKey: 'driver_id' });
 
-TourPackage.hasMany(PackageLog, { foreignKey: 'package_id', as: 'logs' });
-PackageLog.belongsTo(TourPackage, { foreignKey: 'package_id', as: 'package' });
-PackageLog.belongsTo(User, { foreignKey: 'employee_id', as: 'employee' });
-PackageLog.belongsTo(Property, { foreignKey: 'property_id', as: 'property' });
-PackageLog.belongsTo(User, { foreignKey: 'driver_id', as: 'driver' });
+Handoff.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });
+TourPackage.hasMany(Handoff, { as: 'handoffs', foreignKey: 'package_id' });
 
-TourPackage.hasMany(Handoff, { foreignKey: 'package_id', as: 'handoffs' });
-Handoff.belongsTo(TourPackage, { foreignKey: 'package_id', as: 'package' });
-Handoff.belongsTo(User, { foreignKey: 'office_admin_id', as: 'officeAdmin' });
-Handoff.belongsTo(User, { foreignKey: 'accountant_id', as: 'accountant' });
+Handoff.belongsTo(User, { as: 'officeAdmin', foreignKey: 'office_admin_id' });
+Handoff.belongsTo(User, { as: 'accountant', foreignKey: 'accountant_id' });
 
-TourPackage.hasMany(PackageSpending, { foreignKey: 'package_id', as: 'spendings' });
-PackageSpending.belongsTo(TourPackage, { foreignKey: 'package_id', as: 'package' });
-PackageSpending.belongsTo(Handoff, { foreignKey: 'handoff_id', as: 'handoff' });
-PackageSpending.belongsTo(User, { foreignKey: 'recorded_by', as: 'recorder' });
+WalletTransaction.belongsTo(User, { as: 'user', foreignKey: 'user_id' });
+User.hasMany(WalletTransaction, { as: 'walletTransactions', foreignKey: 'user_id' });
 
-User.hasMany(Expense, { foreignKey: 'created_by', as: 'expensesCreated' });
-Expense.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+WalletTransaction.belongsTo(Handoff, { as: 'handoff', foreignKey: 'handoff_id' });
+Handoff.hasMany(WalletTransaction, { as: 'walletTransactions', foreignKey: 'handoff_id' });
 
-User.hasMany(SalaryPayment, { foreignKey: 'employee_id', as: 'salaryPayments' });
-SalaryPayment.belongsTo(User, { foreignKey: 'employee_id', as: 'employee' });
-SalaryPayment.belongsTo(User, { foreignKey: 'paid_by', as: 'payer' });
-Expense.hasOne(SalaryPayment, { foreignKey: 'expense_id', as: 'salaryPayment' });
-SalaryPayment.belongsTo(Expense, { foreignKey: 'expense_id', as: 'expense' });
+PackageSpending.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });
+TourPackage.hasMany(PackageSpending, { as: 'spendings', foreignKey: 'package_id' });
+
+PackageSpending.belongsTo(User, { as: 'creator', foreignKey: 'created_by' });
+
+WalletTransaction.belongsTo(PackageSpending, {
+  as: 'packageSpending',
+  foreignKey: 'package_spending_id',
+});
+PackageSpending.hasMany(WalletTransaction, {
+  as: 'walletTransactions',
+  foreignKey: 'package_spending_id',
+});
 
 module.exports = {
   sequelize,
   Sequelize,
   User,
+  Tourist,
   Property,
   Park,
-  Activity,
-  Tourist,
   TourPackage,
-  PackageItem,
-  Payment,
-  PackageLog,
+  PackageDay,
   Handoff,
+  WalletTransaction,
   PackageSpending,
-  Expense,
-  SalaryPayment,
 };

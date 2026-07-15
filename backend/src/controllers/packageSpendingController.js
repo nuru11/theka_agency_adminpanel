@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const packageSpendingService = require('../services/packageSpendingService');
 
 async function list(_req, res, next) {
@@ -9,40 +11,39 @@ async function list(_req, res, next) {
   }
 }
 
-async function get(req, res, next) {
-  try {
-    const data = await packageSpendingService.getById(req.params.id);
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-}
-
 async function create(req, res, next) {
   try {
-    const data = await packageSpendingService.create(req.body, req.user.id);
+    const data = await packageSpendingService.create(req.body, req.file, req.user.id);
     res.status(201).json({ success: true, data });
   } catch (err) {
     next(err);
   }
 }
 
-async function update(req, res, next) {
+async function screenshot(req, res, next) {
   try {
-    const data = await packageSpendingService.update(req.params.id, req.body);
-    res.json({ success: true, data });
+    const spending = await packageSpendingService.getById(req.params.id);
+    const filePath = packageSpendingService.resolveScreenshotAbsolutePath(spending);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Screenshot not found' });
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const type =
+      ext === '.png'
+        ? 'image/png'
+        : ext === '.webp'
+          ? 'image/webp'
+          : ext === '.gif'
+            ? 'image/gif'
+            : 'image/jpeg';
+
+    res.setHeader('Content-Type', type);
+    fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);
   }
 }
 
-async function remove(req, res, next) {
-  try {
-    await packageSpendingService.remove(req.params.id);
-    res.json({ success: true, message: 'Deleted' });
-  } catch (err) {
-    next(err);
-  }
-}
-
-module.exports = { list, get, create, update, remove };
+module.exports = { list, create, screenshot };

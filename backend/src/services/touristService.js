@@ -1,27 +1,17 @@
-const { Tourist, TourPackage, User } = require('../models');
+const { Tourist, User } = require('../models');
 const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
 
 async function list() {
   return Tourist.findAll({
-    include: [
-      { model: User, as: 'creator', attributes: ['id', 'name'] },
-      { model: TourPackage, as: 'packages', attributes: ['id', 'status', 'package_price'] },
-    ],
+    include: [{ model: User, as: 'creator', attributes: ['id', 'name'] }],
     order: [['created_at', 'DESC']],
   });
 }
 
 async function getById(id) {
   const tourist = await Tourist.findByPk(id, {
-    include: [
-      { model: User, as: 'creator', attributes: ['id', 'name'] },
-      {
-        model: TourPackage,
-        as: 'packages',
-        include: [{ model: User, as: 'assignedEmployee', attributes: ['id', 'name'] }],
-      },
-    ],
+    include: [{ model: User, as: 'creator', attributes: ['id', 'name'] }],
   });
   if (!tourist) throw new AppError('TOURIST_NOT_FOUND', ERROR_CODES.TOURIST_NOT_FOUND, 404);
   return tourist;

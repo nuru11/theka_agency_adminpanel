@@ -1,3 +1,13 @@
+const USER_ROLES = ['superAdmin', 'officeAdmin', 'accountant', 'employee'];
+
+const TOURIST_STATUSES = ['expected', 'received', 'departed', 'cancelled'];
+
+const PROPERTY_TYPES = ['hotel', 'apartment', 'villa'];
+
+const MASTER_STATUSES = ['active', 'inactive'];
+
+const VEHICLE_TYPES = ['van', 'bus', 'vip'];
+
 const PACKAGE_STATUSES = [
   'draft',
   'active',
@@ -9,22 +19,18 @@ const PACKAGE_STATUSES = [
 
 const HANDOFF_STATUSES = ['pending', 'received'];
 
-const EXPENSE_CATEGORIES = ['rent', 'salaries', 'other'];
+const WALLET_TX_TYPES = ['credit', 'debit'];
 
-const PROPERTY_TYPES = ['hotel', 'apartment', 'villa', 'house'];
-
-const VEHICLE_TYPES = ['van', 'bus', 'vip'];
-
-const PACKAGE_ITEM_TYPES = ['accommodation', 'transport', 'activity', 'sim'];
-
-const USER_ROLES = ['superAdmin', 'officeAdmin', 'accountant', 'employee'];
+const SPENDING_REASONS = ['accommodation', 'park', 'food', 'other'];
 
 module.exports = {
+  USER_ROLES,
+  TOURIST_STATUSES,
+  PROPERTY_TYPES,
+  MASTER_STATUSES,
+  VEHICLE_TYPES,
   PACKAGE_STATUSES,
   HANDOFF_STATUSES,
-  EXPENSE_CATEGORIES,
-  PROPERTY_TYPES,
-  VEHICLE_TYPES,
-  PACKAGE_ITEM_TYPES,
-  USER_ROLES,
+  WALLET_TX_TYPES,
+  SPENDING_REASONS,
 };

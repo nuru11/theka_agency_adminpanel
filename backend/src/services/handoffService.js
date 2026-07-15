@@ -1,83 +1,128 @@
-const { sequelize, Handoff, TourPackage, Tourist, User, Payment } = require('../models');
+const {
+  Handoff,
+  TourPackage,
+  Tourist,
+  User,
+  WalletTransaction,
+  sequelize,
+} = require('../models');
 const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
 
-const handoffIncludes = [
+const listIncludes = [
   {
     model: TourPackage,
     as: 'package',
-    include: [
-      { model: Tourist, as: 'tourist' },
-      { model: Payment, as: 'payments' },
-    ],
+    attributes: ['id', 'expected_cost', 'status', 'tourist_id'],
+    include: [{ model: Tourist, as: 'tourist', attributes: ['id', 'name'] }],
   },
   { model: User, as: 'officeAdmin', attributes: ['id', 'name'] },
   { model: User, as: 'accountant', attributes: ['id', 'name'] },
 ];
 
-async function list(filters = {}) {
+async function assertPackage(id) {
+  const pkg = await TourPackage.findByPk(id);
+  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
+  return pkg;
+}
+
+async function assertAccountant(id) {
+  const accountant = await User.findOne({
+    where: { id, role: 'accountant', status: 'active' },
+  });
+  if (!accountant) throw new AppError('ACCOUNTANT_NOT_FOUND', ERROR_CODES.ACCOUNTANT_NOT_FOUND, 404);
+  return accountant;
+}
+
+async function list(user) {
   const where = {};
-  if (filters.status) where.status = filters.status;
-  return Handoff.findAll({ where, include: handoffIncludes, order: [['sent_at', 'DESC']] });
+  if (user.role === 'accountant') {
+    where.accountant_id = user.id;
+  }
+
+  return Handoff.findAll({
+    where,
+    include: listIncludes,
+    order: [['created_at', 'DESC']],
+  });
 }
 
 async function getById(id) {
-  const handoff = await Handoff.findByPk(id, { include: handoffIncludes });
+  const handoff = await Handoff.findByPk(id, { include: listIncludes });
   if (!handoff) throw new AppError('HANDOFF_NOT_FOUND', ERROR_CODES.HANDOFF_NOT_FOUND, 404);
   return handoff;
 }
 
-async function create(data, officeAdminId) {
-  const pkg = await TourPackage.findByPk(data.package_id, {
-    include: [{ model: Payment, as: 'payments' }],
-  });
-  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-  if (!['ready_for_handoff', 'active'].includes(pkg.status)) {
-    throw new AppError('PACKAGE_NOT_READY', ERROR_CODES.PACKAGE_NOT_READY, 400);
-  }
+async function create(data, senderId) {
+  const { package_id, amount, accountant_id, notes } = data;
 
-  const totalPayments = (pkg.payments || []).reduce((sum, p) => sum + parseFloat(p.amount), 0);
-  const amountCollected = data.amount_collected ?? totalPayments;
+  await assertPackage(package_id);
+  await assertAccountant(accountant_id);
 
-  return sequelize.transaction(async (t) => {
+  const handoffId = await sequelize.transaction(async (transaction) => {
     const handoff = await Handoff.create(
       {
-        package_id: data.package_id,
-        office_admin_id: officeAdminId,
-        amount_collected: amountCollected,
-        notes: data.notes || null,
+        package_id,
+        office_admin_id: senderId,
+        accountant_id,
+        amount,
         status: 'pending',
         sent_at: new Date(),
+        notes: notes || null,
       },
-      { transaction: t }
+      { transaction }
     );
-    await pkg.update({ status: 'sent_to_accountant' }, { transaction: t });
-    return getById(handoff.id);
+
+    await TourPackage.update(
+      { status: 'sent_to_accountant' },
+      { where: { id: package_id }, transaction }
+    );
+
+    return handoff.id;
   });
+
+  return getById(handoffId);
 }
 
-async function receive(id, accountantId) {
-  const handoff = await Handoff.findByPk(id, { include: [{ model: TourPackage, as: 'package' }] });
+async function receive(id, accountantUser) {
+  const handoff = await Handoff.findByPk(id);
   if (!handoff) throw new AppError('HANDOFF_NOT_FOUND', ERROR_CODES.HANDOFF_NOT_FOUND, 404);
+
   if (handoff.status !== 'pending') {
     throw new AppError('HANDOFF_NOT_PENDING', ERROR_CODES.HANDOFF_NOT_PENDING, 400);
   }
 
-  return sequelize.transaction(async (t) => {
+  if (handoff.accountant_id !== accountantUser.id) {
+    throw new AppError('FORBIDDEN', ERROR_CODES.FORBIDDEN, 403);
+  }
+
+  await sequelize.transaction(async (transaction) => {
     await handoff.update(
-      { status: 'received', accountant_id: accountantId, received_at: new Date() },
-      { transaction: t }
+      {
+        status: 'received',
+        received_at: new Date(),
+      },
+      { transaction }
     );
-    await handoff.package.update({ status: 'accountant_received' }, { transaction: t });
-    return getById(id);
+
+    await WalletTransaction.create(
+      {
+        user_id: accountantUser.id,
+        type: 'credit',
+        amount: handoff.amount,
+        handoff_id: handoff.id,
+        note: `Handoff #${handoff.id} received`,
+      },
+      { transaction }
+    );
+
+    await TourPackage.update(
+      { status: 'accountant_received' },
+      { where: { id: handoff.package_id }, transaction }
+    );
   });
+
+  return getById(id);
 }
 
-async function markReady(packageId) {
-  const pkg = await TourPackage.findByPk(packageId);
-  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-  await pkg.update({ status: 'ready_for_handoff' });
-  return pkg;
-}
-
-module.exports = { list, getById, create, receive, markReady };
+module.exports = { list, getById, create, receive };

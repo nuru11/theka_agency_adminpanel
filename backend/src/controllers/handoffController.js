@@ -2,9 +2,7 @@ const handoffService = require('../services/handoffService');
 
 async function list(req, res, next) {
   try {
-    const filters = {};
-    if (req.query.status) filters.status = req.query.status;
-    const data = await handoffService.list(filters);
+    const data = await handoffService.list(req.user);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -31,20 +29,11 @@ async function create(req, res, next) {
 
 async function receive(req, res, next) {
   try {
-    const data = await handoffService.receive(req.params.id, req.user.id);
+    const data = await handoffService.receive(req.params.id, req.user);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
 }
 
-async function markReady(req, res, next) {
-  try {
-    const data = await handoffService.markReady(req.params.packageId);
-    res.json({ success: true, data });
-  } catch (err) {
-    next(err);
-  }
-}
-
-module.exports = { list, get, create, receive, markReady };
+module.exports = { list, get, create, receive };

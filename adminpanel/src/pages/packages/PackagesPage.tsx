@@ -1,255 +1,367 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageLayout, { DataTable, formatCurrency } from '../../components/common/PageLayout';
 import Button from '../../components/ui/button/Button';
-import { packageApi, touristApi, userApi, propertyApi, activityApi } from '../../services/thiqaApi';
-import type { TourPackage, Tourist, User, Property, Activity } from '../../types';
+import {
+  packageApi,
+  touristApi,
+  propertyApi,
+  parkApi,
+  driversApi,
+} from '../../services/thiqaApi';
+import type {
+  TourPackage,
+  Tourist,
+  Property,
+  Park,
+  Driver,
+  VehicleType,
+} from '../../types';
 import { Modal } from '../../components/ui/modal';
 import Label from '../../components/form/Label';
 import Input from '../../components/form/input/InputField';
 import Select from '../../components/form/Select';
 
-type SelectedActivity = {
-  activity_id: number;
-  name: string;
-  default_price: number;
-  price: string;
+type DayForm = {
+  day_number: number;
+  park_id: string;
+  park_price: string;
+  driver_id: string;
 };
 
-const emptyForm = {
-  tourist_id: '', assigned_employee_id: '', package_price: '', people_count: '1',
-  accommodation_id: '', accommodation_price: '', driver_id: '', vehicle_type: 'van',
-  sim_included: false, sim_cost: '', payment_amount: '', notes: '',
+type PackageForm = {
+  tourist_id: string;
+  people_count: string;
+  days_count: string;
+  property_id: string;
+  accommodation_price: string;
+  driver_id: string;
+  vehicle_type: VehicleType | '';
+  days: DayForm[];
 };
+
+const emptyDay = (day_number: number): DayForm => ({
+  day_number,
+  park_id: '',
+  park_price: '0',
+  driver_id: '',
+});
+
+const emptyForm = (): PackageForm => ({
+  tourist_id: '',
+  people_count: '1',
+  days_count: '1',
+  property_id: '',
+  accommodation_price: '0',
+  driver_id: '',
+  vehicle_type: '',
+  days: [emptyDay(1)],
+});
+
+const VEHICLE_OPTIONS = [
+  { value: 'van', label: 'Van' },
+  { value: 'bus', label: 'Bus' },
+  { value: 'vip', label: 'VIP' },
+];
 
 export default function PackagesPage() {
-  const [packages, setPackages] = useState<TourPackage[]>([]);
+  const [items, setItems] = useState<TourPackage[]>([]);
   const [tourists, setTourists] = useState<Tourist[]>([]);
-  const [employees, setEmployees] = useState<User[]>([]);
-  const [drivers, setDrivers] = useState<User[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [selectedActivities, setSelectedActivities] = useState<SelectedActivity[]>([]);
-  const [activityToAdd, setActivityToAdd] = useState('');
+  const [parks, setParks] = useState<Park[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<PackageForm>(emptyForm());
+  const [saving, setSaving] = useState(false);
 
-  const load = () => packageApi.list().then((res) => setPackages(res.data.data));
+  const load = async () => {
+    const [pkgs, touristRes, propertyRes, parkRes, driverRes] = await Promise.all([
+      packageApi.list(),
+      touristApi.list(),
+      propertyApi.list(),
+      parkApi.list(),
+      driversApi.list(),
+    ]);
+    setItems(pkgs.data.data);
+    setTourists(touristRes.data.data);
+    setProperties(propertyRes.data.data.filter((p) => p.status === 'active'));
+    setParks(parkRes.data.data.filter((p) => p.status === 'active'));
+    setDrivers(driverRes.data.data);
+  };
 
   useEffect(() => {
     load();
-    touristApi.list().then((r) => setTourists(r.data.data));
-    userApi.listEmployees().then((r) => setEmployees(r.data.data));
-    userApi.listDrivers().then((r) => setDrivers(r.data.data));
-    propertyApi.list().then((r) => setProperties(r.data.data.filter((p) => p.status === 'active')));
-    activityApi.list().then((r) => setActivities(r.data.data.filter((a) => a.status === 'active')));
   }, []);
 
-  const availableActivities = activities.filter(
-    (a) => !selectedActivities.some((s) => s.activity_id === a.id)
-  );
+  const expectedCost = useMemo(() => {
+    const accommodation = Number(form.accommodation_price || 0);
+    const parksTotal = form.days.reduce((sum, d) => sum + Number(d.park_price || 0), 0);
+    return accommodation + parksTotal;
+  }, [form.accommodation_price, form.days]);
 
-  const addActivity = () => {
-    const activity = activities.find((a) => String(a.id) === activityToAdd);
-    if (!activity) return;
-    setSelectedActivities((prev) => [
-      ...prev,
-      {
-        activity_id: activity.id,
-        name: activity.name,
-        default_price: Number(activity.default_price),
-        price: String(activity.default_price),
-      },
-    ]);
-    setActivityToAdd('');
+  const touristOptions = tourists.map((t) => ({ value: String(t.id), label: t.name }));
+  const propertyOptions = properties.map((p) => ({
+    value: String(p.id),
+    label: `${p.name} (${p.city})`,
+  }));
+  const parkOptions = parks.map((p) => ({
+    value: String(p.id),
+    label: `${p.name} (${p.city})`,
+  }));
+  const driverOptions = drivers.map((d) => ({ value: String(d.id), label: d.name }));
+
+  const openCreate = () => {
+    setForm(emptyForm());
+    setOpen(true);
   };
 
-  const removeActivity = (activityId: number) => {
-    setSelectedActivities((prev) => prev.filter((a) => a.activity_id !== activityId));
+  const closeModal = () => {
+    setOpen(false);
+    setForm(emptyForm());
   };
 
-  const updateActivityPrice = (activityId: number, price: string) => {
-    setSelectedActivities((prev) =>
-      prev.map((a) => (a.activity_id === activityId ? { ...a, price } : a))
-    );
-  };
-
-  const activitiesTotal = selectedActivities.reduce(
-    (sum, a) => sum + (Number(a.price) || 0),
-    0
-  );
-
-  const handleAccommodationChange = (id: string) => {
-    const property = properties.find((p) => String(p.id) === id);
-    setForm({
-      ...form,
-      accommodation_id: id,
-      accommodation_price: property ? String(property.price_per_night) : '',
+  const addDay = () => {
+    setForm((prev) => {
+      const days = [...prev.days, emptyDay(prev.days.length + 1)];
+      return { ...prev, days_count: String(days.length), days };
     });
   };
 
-  const resetForm = () => {
-    setForm(emptyForm);
-    setSelectedActivities([]);
-    setActivityToAdd('');
+  const removeDay = (dayNumber: number) => {
+    setForm((prev) => {
+      if (prev.days.length <= 1) return prev;
+      const days = prev.days
+        .filter((d) => d.day_number !== dayNumber)
+        .map((d, index) => ({ ...d, day_number: index + 1 }));
+      return { ...prev, days_count: String(days.length), days };
+    });
   };
+
+  const onPropertyChange = (propertyId: string) => {
+    const property = properties.find((p) => String(p.id) === propertyId);
+    setForm((prev) => ({
+      ...prev,
+      property_id: propertyId,
+      accommodation_price: property ? String(property.price) : prev.accommodation_price,
+    }));
+  };
+
+  const updateDay = (dayNumber: number, patch: Partial<DayForm>) => {
+    setForm((prev) => ({
+      ...prev,
+      days: prev.days.map((d) => (d.day_number === dayNumber ? { ...d, ...patch } : d)),
+    }));
+  };
+
+  const onParkChange = (dayNumber: number, parkId: string) => {
+    const park = parks.find((p) => String(p.id) === parkId);
+    updateDay(dayNumber, {
+      park_id: parkId,
+      park_price: park ? String(park.price) : '0',
+    });
+  };
+
+  const canSubmit =
+    !!form.tourist_id &&
+    !!form.property_id &&
+    !!form.driver_id &&
+    !!form.vehicle_type &&
+    Number(form.people_count) >= 1 &&
+    form.days.every((d) => d.park_id && d.driver_id);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const items = [];
-    if (form.accommodation_id) {
-      items.push({
-        item_type: 'accommodation',
-        property_id: Number(form.accommodation_id),
-        price: Number(form.accommodation_price),
-      });
-    }
-    if (form.driver_id) {
-      items.push({ item_type: 'transport', driver_id: Number(form.driver_id), vehicle_type: form.vehicle_type });
-    }
-    for (const activity of selectedActivities) {
-      items.push({
-        item_type: 'activity',
-        activity_id: activity.activity_id,
-        price: Number(activity.price),
-      });
-    }
-    if (form.sim_included) {
-      items.push({ item_type: 'sim', sim_included: true, sim_cost: Number(form.sim_cost || 0) });
-    }
-
-    const payments = form.payment_amount
-      ? [{ amount: Number(form.payment_amount), payment_date: new Date().toISOString().slice(0, 10) }]
-      : [];
-
+    if (!canSubmit || saving) return;
+    setSaving(true);
     try {
       await packageApi.create({
         tourist_id: Number(form.tourist_id),
-        assigned_employee_id: form.assigned_employee_id ? Number(form.assigned_employee_id) : undefined,
-        package_price: Number(form.package_price),
         people_count: Number(form.people_count),
-        status: 'active',
-        notes: form.notes || undefined,
-        items,
-        payments,
+        days_count: Number(form.days_count),
+        property_id: Number(form.property_id),
+        accommodation_price: Number(form.accommodation_price || 0),
+        driver_id: Number(form.driver_id),
+        vehicle_type: form.vehicle_type as VehicleType,
+        days: form.days.map((d) => ({
+          day_number: d.day_number,
+          park_id: Number(d.park_id),
+          park_price: Number(d.park_price || 0),
+          driver_id: Number(d.driver_id),
+        })),
       });
-      setOpen(false);
-      resetForm();
-      load();
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      window.alert(message || 'Failed to create package');
+      closeModal();
+      await load();
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <PageLayout title="Packages" description="Create tourist packages" action={<Button size="sm" onClick={() => setOpen(true)}>Create Package</Button>}>
+    <PageLayout
+      title="Packages"
+      description="Create and manage tourist packages"
+      action={
+        <Button size="sm" onClick={openCreate}>
+          Create Package
+        </Button>
+      }
+    >
       <DataTable
-        headers={['ID', 'Tourist', 'Employee', 'People', 'Price', 'Status']}
-        rows={packages.map((p) => [
-          p.id,
-          p.tourist?.name || p.tourist_id,
-          p.assignedEmployee?.name || '-',
-          p.people_count,
-          formatCurrency(Number(p.package_price)),
-          p.status,
+        headers={['Tourist', 'People', 'Days', 'Expected Cost', 'Status', 'Created By']}
+        rows={items.map((pkg) => [
+          pkg.tourist?.name || `#${pkg.tourist_id}`,
+          String(pkg.people_count),
+          String(pkg.days_count),
+          formatCurrency(Number(pkg.expected_cost)),
+          pkg.status,
+          pkg.creator?.name || '—',
         ])}
       />
 
-      <Modal isOpen={open} onClose={() => { setOpen(false); resetForm(); }} className="max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="mb-4 text-lg font-semibold">Create Package</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div><Label>Tourist</Label><Select options={tourists.map(t => ({value:String(t.id),label:t.name}))} onChange={(v) => setForm({...form, tourist_id: v})} /></div>
-          <div><Label>Assigned Employee</Label><Select options={employees.map(e => ({value:String(e.id),label:e.name}))} onChange={(v) => setForm({...form, assigned_employee_id: v})} /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Package Price</Label><Input type="number" value={form.package_price} onChange={(e) => setForm({...form, package_price: e.target.value})} /></div>
-            <div><Label>People Count</Label><Input type="number" value={form.people_count} onChange={(e) => setForm({...form, people_count: e.target.value})} /></div>
-          </div>
-          <div className="space-y-3">
-            <Label>Accommodation</Label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Price defaults to catalog price; edit to override for this package.
+      <Modal isOpen={open} onClose={closeModal} className="max-w-3xl p-6">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+          <div className="sticky top-0 z-10 -mx-1 mb-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-800 dark:bg-gray-800">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Expected cost</p>
+            <p className="text-2xl font-semibold text-brand-600 dark:text-brand-400">
+              {formatCurrency(expectedCost)}
             </p>
-            {properties.length > 0 ? (
-              <>
-                <Select
-                  options={properties.map((p) => ({ value: String(p.id), label: `${p.name} (${p.type})` }))}
-                  placeholder="Select accommodation"
-                  onChange={handleAccommodationChange}
-                />
-                {form.accommodation_id && (
+          </div>
+
+          <h2 className="text-lg font-semibold">Create Package</h2>
+
+          <div>
+            <Label>Tourist</Label>
+            <Select
+              key={`tourist-${open}`}
+              options={touristOptions}
+              placeholder="Select tourist"
+              defaultValue={form.tourist_id}
+              onChange={(v) => setForm((prev) => ({ ...prev, tourist_id: v }))}
+            />
+          </div>
+
+          <div>
+            <Label>Number of people</Label>
+            <Input
+              type="number"
+              min="1"
+              value={form.people_count}
+              onChange={(e) => setForm((prev) => ({ ...prev, people_count: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <Label>Accommodation</Label>
+            <Select
+              key={`property-${open}`}
+              options={propertyOptions}
+              placeholder="Select accommodation"
+              defaultValue={form.property_id}
+              onChange={onPropertyChange}
+            />
+          </div>
+          <div>
+            <Label>Accommodation price</Label>
+            <Input
+              type="number"
+              min="0"
+              step={0.01}
+              value={form.accommodation_price}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, accommodation_price: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Driver</Label>
+              <Select
+                key={`driver-${open}`}
+                options={driverOptions}
+                placeholder="Select driver"
+                defaultValue={form.driver_id}
+                onChange={(v) => setForm((prev) => ({ ...prev, driver_id: v }))}
+              />
+            </div>
+            <div>
+              <Label>Car</Label>
+              <Select
+                key={`vehicle-${open}`}
+                options={VEHICLE_OPTIONS}
+                placeholder="Select car"
+                defaultValue={form.vehicle_type}
+                onChange={(v) =>
+                  setForm((prev) => ({ ...prev, vehicle_type: v as VehicleType }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Days ({form.days.length})</h3>
+              <Button type="button" size="sm" variant="outline" onClick={addDay}>
+                Add Day
+              </Button>
+            </div>
+            {form.days.map((day) => (
+              <div
+                key={day.day_number}
+                className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="font-medium">Day {day.day_number}</h3>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={form.days.length <= 1}
+                    onClick={() => removeDay(day.day_number)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+                <div className="space-y-3">
                   <div>
-                    <Label>Accommodation Price</Label>
+                    <Label>Park</Label>
+                    <Select
+                      key={`park-${open}-${day.day_number}-${form.days.length}`}
+                      options={parkOptions}
+                      placeholder="Select park"
+                      defaultValue={day.park_id}
+                      onChange={(v) => onParkChange(day.day_number, v)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Park price</Label>
                     <Input
                       type="number"
                       min="0"
-                      step="0.01"
-                      value={form.accommodation_price}
-                      onChange={(e) => setForm({ ...form, accommodation_price: e.target.value })}
+                      step={0.01}
+                      value={day.park_price}
+                      onChange={(e) =>
+                        updateDay(day.day_number, { park_price: e.target.value })
+                      }
                     />
                   </div>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">No active accommodations available. Add accommodations in the Accommodations catalog first.</p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Driver</Label><Select options={drivers.map(d => ({value:String(d.id),label:d.name}))} onChange={(v) => setForm({...form, driver_id: v})} /></div>
-            <div><Label>Vehicle</Label><Select options={['van','bus','vip'].map(v => ({value:v,label:v}))} defaultValue="van" onChange={(v) => setForm({...form, vehicle_type: v})} /></div>
-          </div>
-
-          <div className="space-y-3">
-            <Label>Activities</Label>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Price defaults to catalog price; edit to override for this package.
-            </p>
-            {selectedActivities.length > 0 && (
-              <div className="space-y-2">
-                {selectedActivities.map((a) => (
-                  <div key={a.activity_id} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-                    <span className="min-w-[120px] flex-1 text-sm font-medium">{a.name}</span>
-                    <div className="w-32">
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={a.price}
-                        onChange={(e) => updateActivityPrice(a.activity_id, e.target.value)}
-                      />
-                    </div>
-                    <Button type="button" size="sm" onClick={() => removeActivity(a.activity_id)}>Remove</Button>
+                  <div>
+                    <Label>Driver</Label>
+                    <Select
+                      key={`day-driver-${open}-${day.day_number}-${form.days.length}`}
+                      options={driverOptions}
+                      placeholder="Select driver"
+                      defaultValue={day.driver_id}
+                      onChange={(v) => updateDay(day.day_number, { driver_id: v })}
+                    />
                   </div>
-                ))}
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Activities total: {formatCurrency(activitiesTotal)}
-                </p>
-              </div>
-            )}
-            {availableActivities.length > 0 ? (
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="min-w-[200px] flex-1">
-                  <Select
-                    key={selectedActivities.map((a) => a.activity_id).join('-') || 'empty'}
-                    options={availableActivities.map((a) => ({ value: String(a.id), label: a.name }))}
-                    placeholder="Select activity"
-                    onChange={(v) => setActivityToAdd(v)}
-                  />
                 </div>
-                <Button type="button" size="sm" onClick={addActivity} disabled={!activityToAdd}>Add Activity</Button>
               </div>
-            ) : selectedActivities.length === 0 ? (
-              <p className="text-sm text-gray-500">No active activities available. Add activities in the Activities catalog first.</p>
-            ) : null}
+            ))}
           </div>
 
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.sim_included} onChange={(e) => setForm({...form, sim_included: e.target.checked})} /> SIM Card</label>
-          {form.sim_included && <div><Label>SIM Cost</Label><Input type="number" value={form.sim_cost} onChange={(e) => setForm({...form, sim_cost: e.target.value})} /></div>}
-          <div><Label>Money Received</Label><Input type="number" value={form.payment_amount} onChange={(e) => setForm({...form, payment_amount: e.target.value})} /></div>
-          <div><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({...form, notes: e.target.value})} /></div>
-          <Button type="submit" size="sm">Create Package</Button>
+          <Button type="submit" size="sm" disabled={!canSubmit || saving}>
+            {saving ? 'Saving...' : 'Save Package'}
+          </Button>
         </form>
       </Modal>
     </PageLayout>

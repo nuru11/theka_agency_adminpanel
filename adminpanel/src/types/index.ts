@@ -1,12 +1,18 @@
 export type UserRole = 'superAdmin' | 'officeAdmin' | 'accountant' | 'employee';
 
+export type TouristStatus = 'expected' | 'received' | 'departed' | 'cancelled';
+
+export type PropertyType = 'hotel' | 'apartment' | 'villa';
+
+export type MasterStatus = 'active' | 'inactive';
+
 export interface User {
   id: number;
   name: string;
   username: string;
   phone?: string;
   role: UserRole;
-  status: 'active' | 'inactive';
+  status: MasterStatus;
   monthly_salary?: number;
   is_driver?: boolean;
   vehicle_types?: string[];
@@ -15,169 +21,159 @@ export interface User {
 export interface Tourist {
   id: number;
   name: string;
-  phone?: string;
-  email?: string;
-  nationality?: string;
-  group_size: number;
-  arrival_date?: string;
-  departure_date?: string;
-  notes?: string;
-  packages?: TourPackage[];
+  phone?: string | null;
+  nationality?: string | null;
+  come_date?: string | null;
+  leave_date?: string | null;
+  status: TouristStatus;
+  amount_received: number;
+  created_by: number;
+  creator?: { id: number; name: string };
 }
 
 export interface Property {
   id: number;
   name: string;
-  type: 'hotel' | 'apartment' | 'villa' | 'house';
-  price_per_night: number;
-  location?: string;
-  status: 'active' | 'inactive';
+  type: PropertyType;
+  location?: string | null;
+  city: string;
+  price: number;
+  commission: number;
+  status: MasterStatus;
 }
 
 export interface Park {
   id: number;
   name: string;
-  commission_amount: number;
-  commission_rate?: number;
-  location?: string;
-  status: 'active' | 'inactive';
+  city: string;
+  price: number;
+  status: MasterStatus;
 }
 
-export interface Activity {
+export type VehicleType = 'van' | 'bus' | 'vip';
+
+export type PackageStatus =
+  | 'draft'
+  | 'active'
+  | 'ready_for_handoff'
+  | 'sent_to_accountant'
+  | 'accountant_received'
+  | 'settled';
+
+export interface Driver {
   id: number;
   name: string;
-  default_price: number;
-  status: 'active' | 'inactive';
+  phone?: string | null;
+  vehicle_types?: string[] | null;
 }
 
-export interface PackageItem {
+export interface PackageDay {
   id?: number;
-  item_type: 'accommodation' | 'transport' | 'activity' | 'sim';
-  property_id?: number;
-  activity_id?: number;
-  park_id?: number;
-  driver_id?: number;
-  vehicle_type?: 'van' | 'bus' | 'vip';
-  sim_included?: boolean;
-  sim_cost?: number;
-  price?: number;
-  notes?: string;
-}
-
-export interface Payment {
-  id?: number;
-  amount: number;
-  payment_date: string;
-  notes?: string;
+  day_number: number;
+  park_id: number;
+  park_price: number;
+  driver_id: number;
+  park?: { id: number; name: string; price?: number };
+  driver?: { id: number; name: string };
 }
 
 export interface TourPackage {
   id: number;
   tourist_id: number;
-  assigned_employee_id?: number;
-  package_price: number;
   people_count: number;
-  status: string;
-  notes?: string;
-  tourist?: Tourist;
-  assignedEmployee?: User;
-  items?: PackageItem[];
-  payments?: Payment[];
-  logs?: PackageLog[];
+  days_count: number;
+  property_id: number;
+  accommodation_price: number;
+  driver_id: number;
+  vehicle_type: VehicleType;
+  expected_cost: number;
+  status: PackageStatus;
+  created_by: number;
+  tourist?: { id: number; name: string };
+  property?: { id: number; name: string };
+  driver?: { id: number; name: string };
+  creator?: { id: number; name: string };
+  days?: PackageDay[];
 }
 
-export interface PackageLog {
-  id: number;
-  package_id: number;
-  employee_id: number;
-  accommodation_type?: string;
-  property_id?: number;
-  transport_type?: string;
-  driver_id?: number;
-  activity_ids?: number[];
-  sim_included: boolean;
-  sim_cost?: number;
+export interface CreatePackagePayload {
+  tourist_id: number;
   people_count: number;
-  money_received: number;
-  notes?: string;
-  package?: TourPackage;
-  created_at?: string;
+  days_count: number;
+  property_id: number;
+  accommodation_price: number;
+  driver_id: number;
+  vehicle_type: VehicleType;
+  days: Array<{
+    day_number: number;
+    park_id: number;
+    park_price: number;
+    driver_id: number;
+  }>;
+}
+
+export type HandoffStatus = 'pending' | 'received';
+
+export interface Accountant {
+  id: number;
+  name: string;
+  phone?: string | null;
+  username?: string;
 }
 
 export interface Handoff {
   id: number;
   package_id: number;
   office_admin_id: number;
-  accountant_id?: number;
-  amount_collected: number;
-  status: 'pending' | 'received';
+  accountant_id: number;
+  amount: number;
+  status: HandoffStatus;
   sent_at: string;
-  received_at?: string;
-  notes?: string;
-  package?: TourPackage;
-  officeAdmin?: User;
-  accountant?: User;
+  received_at?: string | null;
+  notes?: string | null;
+  package?: {
+    id: number;
+    expected_cost?: number;
+    status?: PackageStatus;
+    tourist_id?: number;
+    tourist?: { id: number; name: string };
+  };
+  officeAdmin?: { id: number; name: string };
+  accountant?: { id: number; name: string };
 }
+
+export interface WalletTransaction {
+  id: number;
+  user_id: number;
+  type: 'credit' | 'debit';
+  amount: number;
+  handoff_id?: number | null;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface WalletSummary {
+  balance: number;
+  transactions: WalletTransaction[];
+}
+
+export type SpendingReason = 'accommodation' | 'park' | 'food' | 'other';
 
 export interface PackageSpending {
   id: number;
   package_id: number;
-  handoff_id?: number;
-  accommodation_cost: number;
-  transport_cost: number;
-  activities_cost: number;
-  sim_cost: number;
-  park_commission: number;
-  other_cost: number;
-  notes?: string;
-  package?: TourPackage;
-}
-
-export interface Expense {
-  id: number;
-  category: 'rent' | 'salaries' | 'other';
   amount: number;
-  description?: string;
-  expense_date: string;
-}
-
-export interface SalaryPayment {
-  id: number;
-  employee_id: number;
-  amount: number;
-  pay_period: string;
-  paid_at: string;
-  employee?: User;
-}
-
-export interface DashboardReport {
-  month: string;
-  revenue: number;
-  operatingExpenses: number;
-  packageCosts: number;
-  totalExpenses: number;
-  netProfit: number;
-  touristsCount: number;
-  packagesCount: number;
-  pendingHandoffs: number;
-}
-
-export interface OfficeAdminReport {
-  month: string;
-  touristsReceived: number;
-  packagesSold: number;
-  totalPackageValue: number;
-  moneyCollected: number;
-  sentToAccountant: number;
-}
-
-export interface AccountantReport {
-  month: string;
-  handoffsReceived: number;
-  pendingHandoffs: number;
-  packageSpending: number;
-  rent: number;
-  salaries: number;
-  otherExpenses: number;
-  totalSpent: number;
+  reason: SpendingReason;
+  screenshot_path: string;
+  notes?: string | null;
+  created_by: number;
+  created_at?: string;
+  package?: {
+    id: number;
+    expected_cost?: number;
+    status?: PackageStatus;
+    tourist_id?: number;
+    tourist?: { id: number; name: string };
+  };
+  creator?: { id: number; name: string };
 }

@@ -21,12 +21,13 @@ export default function AuthLayout({
                 <img
                   width={231}
                   height={48}
-                  src="/images/logo/auth-logo.svg"
-                  alt="Logo"
+                  src="/logo/thika_logo.png"
+                  alt="Thiqa Agency"
+                  className="object-contain"
                 />
               </Link>
               <p className="text-center text-gray-400 dark:text-white/60">
-                Free and Open-Source Tailwind CSS Admin Dashboard Template
+                Thiqa Agency — Travel & Tourism
               </p>
             </div>
           </div>

@@ -6,6 +6,9 @@ node_modules/
 .env.local
 *.local
 
+# Uploads
+uploads/
+
 # Build output
 dist/
 dist-ssr/

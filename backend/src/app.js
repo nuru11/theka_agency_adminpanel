@@ -3,17 +3,14 @@ const cors = require('cors');
 const errorHandler = require('./middleware/errorHandler');
 
 const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
+const touristRoutes = require('./routes/touristRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const parkRoutes = require('./routes/parkRoutes');
-const activityRoutes = require('./routes/activityRoutes');
-const touristRoutes = require('./routes/touristRoutes');
 const packageRoutes = require('./routes/packageRoutes');
+const userRoutes = require('./routes/userRoutes');
 const handoffRoutes = require('./routes/handoffRoutes');
+const walletRoutes = require('./routes/walletRoutes');
 const packageSpendingRoutes = require('./routes/packageSpendingRoutes');
-const expenseRoutes = require('./routes/expenseRoutes');
-const salaryRoutes = require('./routes/salaryRoutes');
-const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 
@@ -25,17 +22,14 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/tourists', touristRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/parks', parkRoutes);
-app.use('/api/activities', activityRoutes);
-app.use('/api/tourists', touristRoutes);
 app.use('/api/packages', packageRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/handoffs', handoffRoutes);
-app.use('/api/package-spending', packageSpendingRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/salary-payments', salaryRoutes);
-app.use('/api/reports', reportRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/package-spendings', packageSpendingRoutes);
 
 app.use(errorHandler);
 

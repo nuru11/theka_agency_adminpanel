@@ -10,7 +10,7 @@ router.use(authMiddleware);
 router.get('/', requireRole('superAdmin', 'officeAdmin'), touristController.list);
 router.get('/:id', requireRole('superAdmin', 'officeAdmin'), touristController.get);
 router.post('/', requireRole('superAdmin', 'officeAdmin'), touristValidation, touristController.create);
-router.put('/:id', requireRole('superAdmin', 'officeAdmin'), touristController.update);
+router.put('/:id', requireRole('superAdmin', 'officeAdmin'), touristValidation, touristController.update);
 router.delete('/:id', requireRole('superAdmin', 'officeAdmin'), touristController.remove);
 
 module.exports = router;

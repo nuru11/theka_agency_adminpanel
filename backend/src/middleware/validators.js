@@ -1,6 +1,11 @@
-const { body, param } = require('express-validator');
-const { USER_ROLES, PROPERTY_TYPES, VEHICLE_TYPES, EXPENSE_CATEGORIES } = require('../constants');
+const { body } = require('express-validator');
 const validate = require('./validate');
+const {
+  TOURIST_STATUSES,
+  PROPERTY_TYPES,
+  MASTER_STATUSES,
+  VEHICLE_TYPES,
+} = require('../constants');
 
 const loginValidation = [
   body('username').notEmpty().withMessage('VALIDATION_USERNAME_REQUIRED'),
@@ -8,83 +13,65 @@ const loginValidation = [
   validate,
 ];
 
-const createUserValidation = [
+const touristValidation = [
   body('name').notEmpty().withMessage('VALIDATION_NAME_REQUIRED'),
-  body('username').notEmpty().withMessage('VALIDATION_USERNAME_REQUIRED'),
-  body('password').isLength({ min: 6 }).withMessage('VALIDATION_PASSWORD_MIN'),
-  body('role').isIn(USER_ROLES).withMessage('VALIDATION_INVALID_ROLE'),
-  validate,
-];
-
-const updateUserValidation = [
-  param('id').isInt(),
-  body('role').optional().isIn(USER_ROLES).withMessage('VALIDATION_INVALID_ROLE'),
+  body('phone').optional({ values: 'falsy' }).isString(),
+  body('nationality').optional({ values: 'falsy' }).isString(),
+  body('come_date').optional({ values: 'falsy' }).isISO8601().withMessage('VALIDATION_FAILED'),
+  body('leave_date').optional({ values: 'falsy' }).isISO8601().withMessage('VALIDATION_FAILED'),
+  body('status').optional().isIn(TOURIST_STATUSES).withMessage('VALIDATION_FAILED'),
+  body('amount_received').optional({ values: 'falsy' }).isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
   validate,
 ];
 
 const propertyValidation = [
   body('name').notEmpty().withMessage('VALIDATION_NAME_REQUIRED'),
   body('type').isIn(PROPERTY_TYPES).withMessage('VALIDATION_FAILED'),
-  body('price_per_night').isFloat({ min: 0 }),
+  body('location').optional({ values: 'falsy' }).isString(),
+  body('city').notEmpty().withMessage('VALIDATION_FAILED'),
+  body('price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('commission').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('status').optional().isIn(MASTER_STATUSES).withMessage('VALIDATION_FAILED'),
   validate,
 ];
 
-const touristValidation = [
+const parkValidation = [
   body('name').notEmpty().withMessage('VALIDATION_NAME_REQUIRED'),
-  body('group_size').optional().isInt({ min: 1 }),
+  body('city').notEmpty().withMessage('VALIDATION_FAILED'),
+  body('price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('status').optional().isIn(MASTER_STATUSES).withMessage('VALIDATION_FAILED'),
   validate,
 ];
 
 const packageValidation = [
-  body('tourist_id').isInt(),
-  body('package_price').isFloat({ min: 0 }),
-  body('people_count').isInt({ min: 1 }),
+  body('tourist_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('people_count').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('days_count').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('property_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('accommodation_price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('driver_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('vehicle_type').isIn(VEHICLE_TYPES).withMessage('VALIDATION_FAILED'),
+  body('days').isArray({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('days.*.day_number').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('days.*.park_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('days.*.park_price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('days.*.driver_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   validate,
 ];
 
 const handoffValidation = [
-  body('package_id').isInt(),
+  body('package_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('amount').isFloat({ min: 0.01 }).withMessage('VALIDATION_FAILED'),
+  body('accountant_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('notes').optional({ values: 'falsy' }).isString(),
   validate,
 ];
-
-const expenseValidation = [
-  body('category').isIn(EXPENSE_CATEGORIES).withMessage('VALIDATION_FAILED'),
-  body('amount').isFloat({ min: 0 }),
-  body('expense_date').notEmpty(),
-  validate,
-];
-
-const salaryPaymentValidation = [
-  body('employee_id').isInt(),
-  body('pay_period').matches(/^\d{4}-\d{2}$/).withMessage('INVALID_PAY_PERIOD'),
-  validate,
-];
-
-const packageLogValidation = [
-  body('people_count').isInt({ min: 1 }),
-  body('money_received').isFloat({ min: 0 }),
-  validate,
-];
-
-const vehicleTypeValidation = body('vehicle_types')
-  .optional()
-  .custom((val) => {
-    if (!val) return true;
-    const types = Array.isArray(val) ? val : JSON.parse(val);
-    return types.every((t) => VEHICLE_TYPES.includes(t));
-  })
-  .withMessage('VALIDATION_FAILED');
 
 module.exports = {
   loginValidation,
-  createUserValidation,
-  updateUserValidation,
-  propertyValidation,
   touristValidation,
+  propertyValidation,
+  parkValidation,
   packageValidation,
   handoffValidation,
-  expenseValidation,
-  salaryPaymentValidation,
-  packageLogValidation,
-  vehicleTypeValidation,
 };

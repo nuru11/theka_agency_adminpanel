@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import flatpickr from "flatpickr";
 import "flatpickr/dist/flatpickr.css";
 import Label from "./Label";
-import { CalenderIcon } from "../../icons";
+import { CalenderIcon, TimeIcon } from "../../icons";
 import Hook = flatpickr.Options.Hook;
 import DateOption = flatpickr.Options.DateOption;
 
@@ -13,6 +13,8 @@ type PropsType = {
   defaultDate?: DateOption;
   label?: string;
   placeholder?: string;
+  /** Time-only popup picker (no calendar). */
+  timeOnly?: boolean;
 };
 
 export default function DatePicker({
@@ -22,15 +24,34 @@ export default function DatePicker({
   label,
   defaultDate,
   placeholder,
+  timeOnly = false,
 }: PropsType) {
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   useEffect(() => {
     const flatPickr = flatpickr(`#${id}`, {
       mode: mode || "single",
-      static: true,
+      static: false,
+      appendTo: document.body,
       monthSelectorType: "static",
-      dateFormat: "Y-m-d",
+      enableTime: timeOnly,
+      noCalendar: timeOnly,
+      dateFormat: timeOnly ? "H:i" : "Y-m-d",
+      time_24hr: timeOnly,
       defaultDate,
-      onChange,
+      onChange: (selectedDates, dateStr, instance) => {
+        const handler = onChangeRef.current;
+        if (!handler) return;
+        if (Array.isArray(handler)) {
+          handler.forEach((h) => h(selectedDates, dateStr, instance));
+        } else {
+          handler(selectedDates, dateStr, instance);
+        }
+      },
+      onReady: (_selectedDates, _dateStr, instance) => {
+        instance.calendarContainer.style.zIndex = "100000";
+      },
     });
 
     return () => {
@@ -38,7 +59,11 @@ export default function DatePicker({
         flatPickr.destroy();
       }
     };
-  }, [mode, onChange, id, defaultDate]);
+    // Intentionally only re-init when id/mode/timeOnly change; defaultDate is applied on mount (remount via key).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, id, timeOnly]);
+
+  const Icon = timeOnly ? TimeIcon : CalenderIcon;
 
   return (
     <div>
@@ -52,7 +77,7 @@ export default function DatePicker({
         />
 
         <span className="absolute text-gray-500 -translate-y-1/2 pointer-events-none right-3 top-1/2 dark:text-gray-400">
-          <CalenderIcon className="size-6" />
+          <Icon className="size-6" />
         </span>
       </div>
     </div>

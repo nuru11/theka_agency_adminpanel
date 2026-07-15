@@ -27,4 +27,14 @@ api.interceptors.response.use(
   }
 );
 
+export async function postForm<T>(url: string, formData: FormData) {
+  return api.post<T>(url, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
+export async function getBlob(url: string) {
+  return api.get<Blob>(url, { responseType: 'blob' });
+}
+
 export default api;

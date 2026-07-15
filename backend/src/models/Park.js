@@ -6,9 +6,12 @@ module.exports = (sequelize) => {
     {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       name: { type: DataTypes.STRING(150), allowNull: false },
-      commission_amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
-      commission_rate: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
-      location: { type: DataTypes.STRING(200), allowNull: true },
+      city: { type: DataTypes.STRING(100), allowNull: false },
+      price: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: false,
+        defaultValue: 0,
+      },
       status: {
         type: DataTypes.ENUM('active', 'inactive'),
         allowNull: false,

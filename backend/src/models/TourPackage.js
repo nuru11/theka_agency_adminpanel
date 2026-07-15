@@ -6,9 +6,24 @@ module.exports = (sequelize) => {
     {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       tourist_id: { type: DataTypes.INTEGER, allowNull: false },
-      assigned_employee_id: { type: DataTypes.INTEGER, allowNull: true },
-      package_price: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
       people_count: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+      days_count: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+      property_id: { type: DataTypes.INTEGER, allowNull: false },
+      accommodation_price: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: false,
+        defaultValue: 0,
+      },
+      driver_id: { type: DataTypes.INTEGER, allowNull: false },
+      vehicle_type: {
+        type: DataTypes.ENUM('van', 'bus', 'vip'),
+        allowNull: false,
+      },
+      expected_cost: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: false,
+        defaultValue: 0,
+      },
       status: {
         type: DataTypes.ENUM(
           'draft',
@@ -19,9 +34,8 @@ module.exports = (sequelize) => {
           'settled'
         ),
         allowNull: false,
-        defaultValue: 'draft',
+        defaultValue: 'active',
       },
-      notes: { type: DataTypes.TEXT, allowNull: true },
       created_by: { type: DataTypes.INTEGER, allowNull: false },
     },
     { tableName: 'tour_packages', underscored: true }
