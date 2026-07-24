@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import PageLayout, { StatCard, formatCurrency } from '../../components/common/PageLayout';
+import { useTranslation } from 'react-i18next';
+import PageLayout, { StatCard, formatCurrency, formatDualAmount } from '../../components/common/PageLayout';
 import ComponentCard from '../../components/common/ComponentCard';
 import Button from '../../components/ui/button/Button';
 import { handoffApi, walletApi } from '../../services/thiqaApi';
 import type { Handoff, WalletSummary } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { computeHandoffSummary } from '../../utils/computeHandoffSummary';
+import { getApiErrorMessage } from '../../utils/getApiErrorMessage';
 
 function StatusLabel({ status }: { status: Handoff['status'] }) {
+  const { t } = useTranslation();
   const isPending = status === 'pending';
   return (
     <span
@@ -17,12 +20,13 @@ function StatusLabel({ status }: { status: Handoff['status'] }) {
           : 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-400'
       }`}
     >
-      {isPending ? 'Pending' : 'Received'}
+      {isPending ? t('common.pending') : t('common.received')}
     </span>
   );
 }
 
 export default function ReceivedPage() {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [items, setItems] = useState<Handoff[]>([]);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
@@ -52,6 +56,7 @@ export default function ReceivedPage() {
   const summary = useMemo(() => computeHandoffSummary(items), [items]);
   const pending = items.filter((h) => h.status === 'pending');
   const received = items.filter((h) => h.status === 'received');
+  const locale = i18n.language === 'ar' ? 'ar' : undefined;
 
   const handleReceive = async (id: number) => {
     if (receivingId) return;
@@ -60,27 +65,36 @@ export default function ReceivedPage() {
     try {
       await handoffApi.receive(id);
       await load();
-    } catch {
-      setError('Failed to confirm transfer. Please try again.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, t, 'receivedPage.error'));
     } finally {
       setReceivingId(null);
     }
   };
 
   return (
-    <PageLayout title="Received" description="Confirm money transfers and view wallet balance">
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <PageLayout title={t('receivedPage.title')} description={t('receivedPage.description')}>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {user?.role === 'accountant' && (
-          <StatCard label="Wallet balance" value={formatCurrency(Number(wallet?.balance ?? 0))} />
+          <>
+            <StatCard
+              label={t('receivedPage.walletUsd')}
+              value={formatCurrency(Number(wallet?.balance_usd ?? wallet?.balance ?? 0), 'USD')}
+            />
+            <StatCard
+              label={t('receivedPage.walletEtb')}
+              value={formatCurrency(Number(wallet?.balance_etb ?? 0), 'ETB')}
+            />
+          </>
         )}
         <StatCard
-          label="Pending amount"
-          value={formatCurrency(summary.total_pending)}
+          label={t('receivedPage.pendingAmount')}
+          value={formatCurrency(summary.total_pending, 'USD')}
           color="yellow"
         />
         <StatCard
-          label="Received total"
-          value={formatCurrency(summary.total_received)}
+          label={t('receivedPage.receivedTotal')}
+          value={formatCurrency(summary.total_received, 'USD')}
           color="green"
         />
       </div>
@@ -88,15 +102,22 @@ export default function ReceivedPage() {
       {error && <p className="mb-4 text-sm text-error-500">{error}</p>}
 
       <div className="mb-6">
-        <ComponentCard title="Awaiting confirmation">
+        <ComponentCard title={t('receivedPage.awaitingConfirmation')}>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  {['Package', 'Tourist', 'Amount', 'From', 'Sent At', 'Action'].map((h) => (
+                  {[
+                    t('common.package'),
+                    t('common.tourist'),
+                    t('common.amount'),
+                    t('receivedPage.from'),
+                    t('receivedPage.sentAt'),
+                    t('receivedPage.action'),
+                  ].map((h) => (
                     <th
                       key={h}
-                      className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300"
+                      className="px-3 py-2 text-start font-medium text-gray-600 dark:text-gray-300"
                     >
                       {h}
                     </th>
@@ -107,7 +128,7 @@ export default function ReceivedPage() {
                 {pending.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-8 text-center text-gray-500">
-                      No pending transfers
+                      {t('receivedPage.noPending')}
                     </td>
                   </tr>
                 ) : (
@@ -115,16 +136,16 @@ export default function ReceivedPage() {
                     <tr key={h.id} className="border-b border-gray-100 dark:border-gray-800">
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">#{h.package_id}</td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                        {h.package?.tourist?.name || '—'}
+                        {h.package?.tourist?.name || t('common.emDash')}
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
-                        {formatCurrency(Number(h.amount))}
+                        {formatDualAmount(Number(h.amount), Number(h.amount_etb || 0))}
                       </td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                        {h.officeAdmin?.name || '—'}
+                        {h.officeAdmin?.name || t('common.emDash')}
                       </td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                        {h.sent_at ? new Date(h.sent_at).toLocaleString() : '—'}
+                        {h.sent_at ? new Date(h.sent_at).toLocaleString(locale) : t('common.emDash')}
                       </td>
                       <td className="px-3 py-2">
                         {user?.role === 'accountant' ? (
@@ -133,10 +154,12 @@ export default function ReceivedPage() {
                             disabled={receivingId === h.id}
                             onClick={() => handleReceive(h.id)}
                           >
-                            {receivingId === h.id ? 'Accepting...' : 'I received'}
+                            {receivingId === h.id
+                              ? t('receivedPage.accepting')
+                              : t('receivedPage.iReceived')}
                           </Button>
                         ) : (
-                          '—'
+                          t('common.emDash')
                         )}
                       </td>
                     </tr>
@@ -148,15 +171,22 @@ export default function ReceivedPage() {
         </ComponentCard>
       </div>
 
-      <ComponentCard title="Received history">
+      <ComponentCard title={t('receivedPage.receivedHistory')}>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
-                {['Package', 'Tourist', 'Amount', 'From', 'Status', 'Received At'].map((h) => (
+                {[
+                  t('common.package'),
+                  t('common.tourist'),
+                  t('common.amount'),
+                  t('receivedPage.from'),
+                  t('common.status'),
+                  t('receivedPage.receivedAt'),
+                ].map((h) => (
                   <th
                     key={h}
-                    className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300"
+                    className="px-3 py-2 text-start font-medium text-gray-600 dark:text-gray-300"
                   >
                     {h}
                   </th>
@@ -167,7 +197,7 @@ export default function ReceivedPage() {
               {received.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3 py-8 text-center text-gray-500">
-                    No received transfers yet
+                    {t('receivedPage.noReceived')}
                   </td>
                 </tr>
               ) : (
@@ -175,19 +205,21 @@ export default function ReceivedPage() {
                   <tr key={h.id} className="border-b border-gray-100 dark:border-gray-800">
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">#{h.package_id}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                      {h.package?.tourist?.name || '—'}
+                      {h.package?.tourist?.name || t('common.emDash')}
                     </td>
                     <td className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
-                      {formatCurrency(Number(h.amount))}
+                      {formatDualAmount(Number(h.amount), Number(h.amount_etb || 0))}
                     </td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                      {h.officeAdmin?.name || '—'}
+                      {h.officeAdmin?.name || t('common.emDash')}
                     </td>
                     <td className="px-3 py-2">
                       <StatusLabel status={h.status} />
                     </td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                      {h.received_at ? new Date(h.received_at).toLocaleString() : '—'}
+                      {h.received_at
+                        ? new Date(h.received_at).toLocaleString(locale)
+                        : t('common.emDash')}
                     </td>
                   </tr>
                 ))

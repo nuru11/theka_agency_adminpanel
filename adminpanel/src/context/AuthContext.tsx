@@ -12,29 +12,60 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const USER_ROLES: UserRole[] = ['superAdmin', 'officeAdmin', 'accountant', 'employee'];
+
+function readStoredUser(): User | null {
+  const token = localStorage.getItem('thiqa_token');
+  const stored = localStorage.getItem('thiqa_user');
+  if (!token || !stored) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as User;
+    return parsed?.role && USER_ROLES.includes(parsed.role) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearStoredAuth() {
+  localStorage.removeItem('thiqa_token');
+  localStorage.removeItem('thiqa_user');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('thiqa_user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState<User | null>(() => readStoredUser());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('thiqa_token');
     if (!token) {
+      if (localStorage.getItem('thiqa_user')) {
+        clearStoredAuth();
+      }
+      setUser(null);
       setLoading(false);
       return;
     }
+
     authApi
       .me()
       .then((res) => {
-        setUser(res.data.data);
-        localStorage.setItem('thiqa_user', JSON.stringify(res.data.data));
+        const nextUser = res.data.data;
+        if (!nextUser?.role || !USER_ROLES.includes(nextUser.role)) {
+          clearStoredAuth();
+          setUser(null);
+          return;
+        }
+        setUser(nextUser);
+        localStorage.setItem('thiqa_user', JSON.stringify(nextUser));
       })
-      .catch(() => {
-        localStorage.removeItem('thiqa_token');
-        localStorage.removeItem('thiqa_user');
-        setUser(null);
+      .catch((err: { response?: { status?: number } }) => {
+        if (err.response?.status === 401) {
+          clearStoredAuth();
+          setUser(null);
+        }
       })
       .finally(() => setLoading(false));
   }, []);
@@ -42,14 +73,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     const res = await authApi.login(username, password);
     const { token, user: loggedInUser } = res.data.data;
+    if (!loggedInUser?.role || !USER_ROLES.includes(loggedInUser.role)) {
+      throw new Error('Invalid user role');
+    }
     localStorage.setItem('thiqa_token', token);
     localStorage.setItem('thiqa_user', JSON.stringify(loggedInUser));
     setUser(loggedInUser);
   };
 
   const logout = () => {
-    localStorage.removeItem('thiqa_token');
-    localStorage.removeItem('thiqa_user');
+    clearStoredAuth();
     setUser(null);
     authApi.logout().catch(() => {});
   };

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import PageLayout, { DataTable, formatCurrency } from '../../components/common/PageLayout';
 import Button from '../../components/ui/button/Button';
 import { propertyApi } from '../../services/thiqaApi';
@@ -28,22 +29,41 @@ const emptyForm: PropertyForm = {
   status: 'active',
 };
 
-const TYPE_OPTIONS = [
-  { value: 'hotel', label: 'Hotel' },
-  { value: 'apartment', label: 'Apartment' },
-  { value: 'villa', label: 'Villa' },
-];
-
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-];
-
 export default function PropertiesPage() {
+  const { t, i18n } = useTranslation();
   const [items, setItems] = useState<Property[]>([]);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<PropertyForm>(emptyForm);
+
+  const typeOptions = useMemo(
+    () => [
+      { value: 'hotel', label: t('properties.hotel') },
+      { value: 'apartment', label: t('properties.apartment') },
+      { value: 'villa', label: t('properties.villa') },
+    ],
+    [t]
+  );
+
+  const statusOptions = useMemo(
+    () => [
+      { value: 'active', label: t('common.active') },
+      { value: 'inactive', label: t('common.inactive') },
+    ],
+    [t]
+  );
+
+  const typeLabel = (type: string) => {
+    const map: Record<string, string> = {
+      hotel: t('properties.hotel'),
+      apartment: t('properties.apartment'),
+      villa: t('properties.villa'),
+    };
+    return map[type] || type;
+  };
+
+  const statusLabel = (status: string) =>
+    status === 'active' ? t('common.active') : status === 'inactive' ? t('common.inactive') : status;
 
   const load = () => propertyApi.list().then((res) => setItems(res.data.data));
   useEffect(() => {
@@ -98,61 +118,70 @@ export default function PropertiesPage() {
 
   return (
     <PageLayout
-      title="Accommodations"
-      description="Hotels, apartments, and villas"
+      title={t('properties.title')}
+      description={t('properties.description')}
       action={
         <Button size="sm" onClick={openCreate}>
-          Add Accommodation
+          {t('properties.add')}
         </Button>
       }
     >
       <DataTable
-        headers={['Name', 'Type', 'Location', 'City', 'Price', 'Commission', 'Status', 'Actions']}
+        headers={[
+          t('common.name'),
+          t('common.type'),
+          t('common.location'),
+          t('common.city'),
+          t('common.price'),
+          t('common.commission'),
+          t('common.status'),
+          t('common.actions'),
+        ]}
         rows={items.map((p) => [
           p.name,
-          p.type,
-          p.location || '—',
+          typeLabel(p.type),
+          p.location || t('common.emDash'),
           p.city,
           formatCurrency(Number(p.price)),
           formatCurrency(Number(p.commission)),
-          p.status,
+          statusLabel(p.status),
           <Button key={p.id} size="sm" variant="outline" onClick={() => openEdit(p)}>
-            Edit
+            {t('common.edit')}
           </Button>,
         ])}
       />
 
       <Modal isOpen={open} onClose={closeModal} className="max-w-lg p-6">
         <h2 className="mb-4 text-lg font-semibold">
-          {editingId ? 'Edit Accommodation' : 'Add Accommodation'}
+          {editingId ? t('properties.edit') : t('properties.add')}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label>Name</Label>
+            <Label>{t('common.name')}</Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
-            <Label>Type</Label>
+            <Label>{t('common.type')}</Label>
             <Select
-              key={`type-${editingId ?? 'new'}-${open}`}
-              options={TYPE_OPTIONS}
+              key={`type-${editingId ?? 'new'}-${open}-${i18n.language}`}
+              options={typeOptions}
               defaultValue={form.type}
               onChange={(v) => setForm({ ...form, type: v as PropertyType })}
             />
           </div>
           <div>
-            <Label>Location</Label>
+            <Label>{t('common.location')}</Label>
             <Input
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
             />
           </div>
           <div>
-            <Label>City</Label>
+            <Label>{t('common.city')}</Label>
             <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           </div>
           <div>
-            <Label>Price</Label>
+            <Label>{t('common.price')}</Label>
             <Input
               type="number"
               min="0"
@@ -162,7 +191,7 @@ export default function PropertiesPage() {
             />
           </div>
           <div>
-            <Label>Commission</Label>
+            <Label>{t('common.commission')}</Label>
             <Input
               type="number"
               min="0"
@@ -172,16 +201,16 @@ export default function PropertiesPage() {
             />
           </div>
           <div>
-            <Label>Status</Label>
+            <Label>{t('common.status')}</Label>
             <Select
-              key={`status-${editingId ?? 'new'}-${open}`}
-              options={STATUS_OPTIONS}
+              key={`status-${editingId ?? 'new'}-${open}-${i18n.language}`}
+              options={statusOptions}
               defaultValue={form.status}
               onChange={(v) => setForm({ ...form, status: v as MasterStatus })}
             />
           </div>
           <Button type="submit" size="sm" disabled={!form.name.trim() || !form.city.trim()}>
-            Save
+            {t('common.save')}
           </Button>
         </form>
       </Modal>

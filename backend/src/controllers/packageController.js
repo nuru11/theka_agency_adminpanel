@@ -27,4 +27,13 @@ async function create(req, res, next) {
   }
 }
 
-module.exports = { list, get, create };
+async function settle(req, res, next) {
+  try {
+    const data = await packageService.settle(req.params.id, req.body, req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { list, get, create, settle };

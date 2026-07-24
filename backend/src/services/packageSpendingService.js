@@ -5,11 +5,13 @@ const {
   Tourist,
   User,
   WalletTransaction,
+  FundReturn,
   sequelize,
 } = require('../models');
 const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
 const walletService = require('./walletService');
+const exchangeRateService = require('./exchangeRateService');
 const { uploadDir } = require('../middleware/upload');
 const { SPENDING_REASONS } = require('../constants');
 
@@ -36,15 +38,23 @@ async function getById(id) {
   return row;
 }
 
+async function getPendingReturnEtb(userId) {
+  const rows = await FundReturn.findAll({
+    where: { accountant_id: userId, status: 'pending' },
+    attributes: ['amount_etb'],
+  });
+  return rows.reduce((sum, r) => sum + Number(r.amount_etb || 0), 0);
+}
+
 async function create(data, file, userId) {
   if (!file) throw new AppError('SCREENSHOT_REQUIRED', ERROR_CODES.SCREENSHOT_REQUIRED, 400);
 
   const package_id = Number(data.package_id);
-  const amount = Number(data.amount);
+  const amountEtb = Number(data.amount);
   const reason = data.reason;
   const notes = data.notes || null;
 
-  if (!package_id || Number.isNaN(amount) || amount <= 0) {
+  if (!package_id || Number.isNaN(amountEtb) || amountEtb <= 0) {
     throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
   }
   if (!SPENDING_REASONS.includes(reason)) {
@@ -54,8 +64,14 @@ async function create(data, file, userId) {
   const pkg = await TourPackage.findByPk(package_id);
   if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
 
+  const rate = await exchangeRateService.requireCurrent();
+  const exchange_rate = Number(rate.usd_to_etb);
+  const amountUsd = exchangeRateService.etbToUsd(amountEtb, exchange_rate);
+
   const wallet = await walletService.getWallet(userId);
-  if (amount > wallet.balance) {
+  const pendingEtb = await getPendingReturnEtb(userId);
+  const availableEtb = Math.round((wallet.balance_etb - pendingEtb) * 100) / 100;
+  if (amountEtb > availableEtb) {
     throw new AppError('INSUFFICIENT_WALLET_BALANCE', ERROR_CODES.INSUFFICIENT_WALLET_BALANCE, 400);
   }
 
@@ -65,7 +81,7 @@ async function create(data, file, userId) {
     const spending = await PackageSpending.create(
       {
         package_id,
-        amount,
+        amount: amountEtb,
         reason,
         screenshot_path: relativePath,
         notes,
@@ -78,7 +94,10 @@ async function create(data, file, userId) {
       {
         user_id: userId,
         type: 'debit',
-        amount,
+        amount: amountUsd,
+        amount_usd: amountUsd,
+        amount_etb: amountEtb,
+        exchange_rate,
         package_spending_id: spending.id,
         note: `Package spending #${spending.id} (${reason})`,
       },

@@ -22,6 +22,8 @@ const PackageDay = require('./PackageDay')(sequelize);
 const Handoff = require('./Handoff')(sequelize);
 const WalletTransaction = require('./WalletTransaction')(sequelize);
 const PackageSpending = require('./PackageSpending')(sequelize);
+const ExchangeRate = require('./ExchangeRate')(sequelize);
+const FundReturn = require('./FundReturn')(sequelize);
 
 Tourist.belongsTo(User, { as: 'creator', foreignKey: 'created_by' });
 User.hasMany(Tourist, { as: 'tourists', foreignKey: 'created_by' });
@@ -67,6 +69,22 @@ PackageSpending.hasMany(WalletTransaction, {
   foreignKey: 'package_spending_id',
 });
 
+ExchangeRate.belongsTo(User, { as: 'setter', foreignKey: 'set_by' });
+
+FundReturn.belongsTo(User, { as: 'accountant', foreignKey: 'accountant_id' });
+FundReturn.belongsTo(User, { as: 'receiver', foreignKey: 'received_by' });
+FundReturn.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });
+TourPackage.hasMany(FundReturn, { as: 'fundReturns', foreignKey: 'package_id' });
+
+WalletTransaction.belongsTo(FundReturn, {
+  as: 'fundReturn',
+  foreignKey: 'fund_return_id',
+});
+FundReturn.hasMany(WalletTransaction, {
+  as: 'walletTransactions',
+  foreignKey: 'fund_return_id',
+});
+
 module.exports = {
   sequelize,
   Sequelize,
@@ -79,4 +97,6 @@ module.exports = {
   Handoff,
   WalletTransaction,
   PackageSpending,
+  ExchangeRate,
+  FundReturn,
 };

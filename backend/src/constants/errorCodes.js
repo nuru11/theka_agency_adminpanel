@@ -42,6 +42,12 @@ const ERROR_CODES = {
   INSUFFICIENT_WALLET_BALANCE: 'Insufficient wallet balance',
   SCREENSHOT_REQUIRED: 'Screenshot is required',
   PACKAGE_LOG_NOT_FOUND: 'Package log not found',
+  EXCHANGE_RATE_NOT_SET: 'Exchange rate is not set. Super admin must set USD to ETB rate first.',
+  FUND_RETURN_NOT_FOUND: 'Fund return not found',
+  FUND_RETURN_NOT_PENDING: 'Fund return is not pending',
+  PACKAGE_ALREADY_SETTLED: 'Package is already settled',
+  INVALID_SETTLE_ACTION: 'Settle action must be keep or return',
+  NOTHING_TO_RETURN: 'No remaining funds to return for this package',
 };
 
 module.exports = ERROR_CODES;

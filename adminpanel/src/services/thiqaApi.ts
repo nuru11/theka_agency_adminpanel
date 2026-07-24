@@ -11,6 +11,8 @@ import type {
   Handoff,
   WalletSummary,
   PackageSpending,
+  ExchangeRate,
+  FundReturn,
 } from '../types';
 
 export const authApi = {
@@ -60,6 +62,11 @@ export const packageApi = {
   get: (id: number) => api.get<{ success: boolean; data: TourPackage }>(`/packages/${id}`),
   create: (data: CreatePackagePayload) =>
     api.post<{ success: boolean; data: TourPackage }>('/packages', data),
+  settle: (id: number, data: { action: 'keep' | 'return'; notes?: string | null }) =>
+    api.post<{
+      success: boolean;
+      data: { package: TourPackage; fund_return: FundReturn | null };
+    }>(`/packages/${id}/settle`, data),
 };
 
 export const handoffApi = {
@@ -87,4 +94,18 @@ export const packageSpendingApi = {
   create: (formData: FormData) =>
     postForm<{ success: boolean; data: PackageSpending }>('/package-spendings', formData),
   screenshot: (id: number) => getBlob(`/package-spendings/${id}/screenshot`),
+};
+
+export const exchangeRateApi = {
+  get: () => api.get<{ success: boolean; data: ExchangeRate | null }>('/exchange-rate'),
+  set: (usd_to_etb: number) =>
+    api.post<{ success: boolean; data: ExchangeRate }>('/exchange-rate', { usd_to_etb }),
+};
+
+export const fundReturnApi = {
+  list: () => api.get<{ success: boolean; data: FundReturn[] }>('/fund-returns'),
+  create: (data: { amount_etb: number; package_id?: number | null; notes?: string | null }) =>
+    api.post<{ success: boolean; data: FundReturn }>('/fund-returns', data),
+  receive: (id: number) =>
+    api.patch<{ success: boolean; data: FundReturn }>(`/fund-returns/${id}/receive`),
 };

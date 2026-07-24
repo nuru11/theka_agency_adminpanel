@@ -8,6 +8,7 @@ layer(base);
 @theme {
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;
+  --font-cairo: Cairo, Outfit, sans-serif;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;
@@ -185,6 +186,10 @@ layer(base);
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+  html.font-arabic body {
+    @apply font-cairo;
+  }
+
   body {
     @apply relative font-normal font-outfit z-1 bg-gray-50;
   }

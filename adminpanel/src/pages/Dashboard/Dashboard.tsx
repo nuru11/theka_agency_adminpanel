@@ -1,20 +1,12 @@
-import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import PageLayout from '../../components/common/PageLayout';
-import ComponentCard from '../../components/common/ComponentCard';
-
-const roleLabels: Record<string, string> = {
-  superAdmin: 'Super Admin',
-  officeAdmin: 'Office Admin',
-  accountant: 'Accountant',
-  employee: 'Employee',
-};
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { t } = useTranslation();
 
   return (
-    <PageLayout title="Dashboard" description="Welcome to Thiqa Agency admin panel">
-     
+    <PageLayout title={t('dashboard.title')} description={t('dashboard.description')}>
+      <></>
     </PageLayout>
   );
 }

@@ -5,8 +5,10 @@ async function getWallet(userId) {
   const [row] = await sequelize.query(
     `
     SELECT
-      COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0)
-      - COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) AS balance
+      COALESCE(SUM(CASE WHEN type = 'credit' THEN COALESCE(amount_usd, amount) ELSE 0 END), 0)
+      - COALESCE(SUM(CASE WHEN type = 'debit' THEN COALESCE(amount_usd, amount) ELSE 0 END), 0) AS balance_usd,
+      COALESCE(SUM(CASE WHEN type = 'credit' THEN COALESCE(amount_etb, 0) ELSE 0 END), 0)
+      - COALESCE(SUM(CASE WHEN type = 'debit' THEN COALESCE(amount_etb, 0) ELSE 0 END), 0) AS balance_etb
     FROM wallet_transactions
     WHERE user_id = :userId
     `,
@@ -19,8 +21,13 @@ async function getWallet(userId) {
     limit: 50,
   });
 
+  const balance_usd = Number(row?.balance_usd || 0);
+  const balance_etb = Number(row?.balance_etb || 0);
+
   return {
-    balance: Number(row?.balance || 0),
+    balance: balance_usd,
+    balance_usd,
+    balance_etb,
     transactions,
   };
 }

@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import PageLayout, { StatCard, formatCurrency } from '../../components/common/PageLayout';
+import { useTranslation } from 'react-i18next';
+import PageLayout, { StatCard, formatCurrency, formatDualAmount } from '../../components/common/PageLayout';
 import ComponentCard from '../../components/common/ComponentCard';
 import Button from '../../components/ui/button/Button';
-import { handoffApi, packageApi, accountantsApi } from '../../services/thiqaApi';
-import type { Accountant, Handoff, TourPackage } from '../../types';
+import { handoffApi, packageApi, accountantsApi, exchangeRateApi } from '../../services/thiqaApi';
+import type { Accountant, ExchangeRate, Handoff, TourPackage } from '../../types';
 import Label from '../../components/form/Label';
 import Input from '../../components/form/input/InputField';
 import Select from '../../components/form/Select';
 import TextArea from '../../components/form/input/TextArea';
 import { computeHandoffSummary } from '../../utils/computeHandoffSummary';
+import { getApiErrorMessage } from '../../utils/getApiErrorMessage';
+import { useAuth } from '../../context/AuthContext';
 
 type FormState = {
   package_id: string;
@@ -25,6 +28,7 @@ const emptyForm: FormState = {
 };
 
 function StatusLabel({ status }: { status: Handoff['status'] }) {
+  const { t } = useTranslation();
   const isPending = status === 'pending';
   return (
     <span
@@ -34,30 +38,43 @@ function StatusLabel({ status }: { status: Handoff['status'] }) {
           : 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-400'
       }`}
     >
-      {isPending ? 'Pending' : 'Received'}
+      {isPending ? t('common.pending') : t('common.received')}
     </span>
   );
 }
 
 export default function HandoffsPage() {
+  const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'superAdmin';
+
   const [items, setItems] = useState<Handoff[]>([]);
   const [packages, setPackages] = useState<TourPackage[]>([]);
   const [accountants, setAccountants] = useState<Accountant[]>([]);
+  const [rate, setRate] = useState<ExchangeRate | null>(null);
+  const [rateInput, setRateInput] = useState('');
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formKey, setFormKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [savingRate, setSavingRate] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [rateError, setRateError] = useState('');
+  const [rateSuccess, setRateSuccess] = useState('');
 
   const load = async () => {
-    const [handoffsRes, packagesRes, accountantsRes] = await Promise.all([
+    const [handoffsRes, packagesRes, accountantsRes, rateRes] = await Promise.all([
       handoffApi.list(),
       packageApi.list(),
       accountantsApi.list(),
+      exchangeRateApi.get(),
     ]);
     setItems(handoffsRes.data.data);
     setPackages(packagesRes.data.data);
     setAccountants(accountantsRes.data.data);
+    const current = rateRes.data.data;
+    setRate(current);
+    if (current) setRateInput(String(current.usd_to_etb));
   };
 
   useEffect(() => {
@@ -65,10 +82,19 @@ export default function HandoffsPage() {
   }, []);
 
   const summary = useMemo(() => computeHandoffSummary(items), [items]);
+  const usdToEtb = rate ? Number(rate.usd_to_etb) : 0;
+  const etbPreview =
+    usdToEtb > 0 && Number(form.amount) > 0
+      ? Math.round(Number(form.amount) * usdToEtb * 100) / 100
+      : 0;
 
   const packageOptions = packages.map((p) => ({
     value: String(p.id),
-    label: `#${p.id} — ${p.tourist?.name || 'Tourist'} (expected ${formatCurrency(Number(p.expected_cost))})`,
+    label: t('handoffs.packageOption', {
+      id: p.id,
+      name: p.tourist?.name || t('handoffs.touristFallback'),
+      cost: formatCurrency(Number(p.expected_cost), 'ETB'),
+    }),
   }));
 
   const accountantOptions = accountants.map((a) => ({
@@ -77,7 +103,24 @@ export default function HandoffsPage() {
   }));
 
   const canSubmit =
-    !!form.package_id && !!form.accountant_id && Number(form.amount) > 0;
+    !!form.package_id && !!form.accountant_id && Number(form.amount) > 0 && !!rate;
+
+  const handleSaveRate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin || savingRate || Number(rateInput) <= 0) return;
+    setSavingRate(true);
+    setRateError('');
+    setRateSuccess('');
+    try {
+      const res = await exchangeRateApi.set(Number(rateInput));
+      setRate(res.data.data);
+      setRateSuccess(t('handoffs.rateSaved'));
+    } catch (err: unknown) {
+      setRateError(getApiErrorMessage(err, t, 'handoffs.rateSaveError'));
+    } finally {
+      setSavingRate(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,55 +135,92 @@ export default function HandoffsPage() {
         amount: Number(form.amount),
         notes: form.notes.trim() || null,
       });
-      setSuccess('Transfer sent successfully.');
+      setSuccess(t('handoffs.success'));
       setForm(emptyForm);
       setFormKey((k) => k + 1);
       await load();
-    } catch {
-      setError('Failed to send transfer. Please try again.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, t, 'handoffs.error'));
     } finally {
       setSaving(false);
     }
   };
 
+  const locale = i18n.language === 'ar' ? 'ar' : undefined;
+
   return (
-    <PageLayout
-      title="Send to Accountant"
-      description="Transfer package money to the accountant wallet"
-    >
+    <PageLayout title={t('handoffs.title')} description={t('handoffs.description')}>
+      {isSuperAdmin && (
+        <div className="mb-6">
+          <ComponentCard title={t('handoffs.setRate')}>
+            <form onSubmit={handleSaveRate} className="flex flex-wrap items-end gap-4">
+              <div className="min-w-[200px] flex-1">
+                <Label>{t('handoffs.rateHint')}</Label>
+                <Input
+                  type="number"
+                  min="0.0001"
+                  step={0.0001}
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                />
+              </div>
+              <Button type="submit" size="sm" disabled={savingRate || Number(rateInput) <= 0}>
+                {savingRate ? t('common.saving') : t('handoffs.saveRate')}
+              </Button>
+              {rateError && <p className="w-full text-sm text-error-500">{rateError}</p>}
+              {rateSuccess && <p className="w-full text-sm text-success-500">{rateSuccess}</p>}
+            </form>
+          </ComponentCard>
+        </div>
+      )}
+
+      <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+        {rate
+          ? t('handoffs.currentRate', { rate: Number(rate.usd_to_etb) })
+          : t('handoffs.noRate')}
+      </div>
+
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total sent" value={formatCurrency(summary.total_sent)} />
-        <StatCard label="Pending acceptance" value={formatCurrency(summary.total_pending)} color="yellow" />
-        <StatCard label="Received" value={formatCurrency(summary.total_received)} color="green" />
+        <StatCard label={t('handoffs.totalSent')} value={formatCurrency(summary.total_sent, 'USD')} />
+        <StatCard
+          label={t('handoffs.pendingAcceptance')}
+          value={formatCurrency(summary.total_pending, 'USD')}
+          color="yellow"
+        />
+        <StatCard
+          label={t('handoffs.received')}
+          value={formatCurrency(summary.total_received, 'USD')}
+          color="green"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <ComponentCard title="New transfer">
+        <ComponentCard title={t('handoffs.newTransfer')}>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <p className="text-sm text-error-500">{error}</p>}
             {success && <p className="text-sm text-success-500">{success}</p>}
             <div>
-              <Label>Package</Label>
+              <Label>{t('common.package')}</Label>
               <Select
-                key={`package-${formKey}`}
+                key={`package-${formKey}-${i18n.language}`}
                 options={packageOptions}
-                placeholder="Select package"
+                placeholder={t('handoffs.selectPackage')}
                 defaultValue={form.package_id}
                 onChange={(v) => setForm((prev) => ({ ...prev, package_id: v }))}
               />
             </div>
             <div>
-              <Label>Accountant</Label>
+              <Label>{t('handoffs.accountant')}</Label>
               <Select
-                key={`accountant-${formKey}`}
+                key={`accountant-${formKey}-${i18n.language}`}
                 options={accountantOptions}
-                placeholder="Select accountant"
+                placeholder={t('handoffs.selectAccountant')}
                 defaultValue={form.accountant_id}
                 onChange={(v) => setForm((prev) => ({ ...prev, accountant_id: v }))}
               />
             </div>
             <div>
-              <Label>Amount</Label>
+              <Label>{t('handoffs.amountUsd')}</Label>
               <Input
                 type="number"
                 min="0.01"
@@ -148,9 +228,14 @@ export default function HandoffsPage() {
                 value={form.amount}
                 onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
               />
+              {etbPreview > 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  {t('handoffs.etbPreview', { amount: formatCurrency(etbPreview, 'ETB') })}
+                </p>
+              )}
             </div>
             <div>
-              <Label>Notes</Label>
+              <Label>{t('common.notes')}</Label>
               <TextArea
                 value={form.notes}
                 onChange={(value) => setForm((prev) => ({ ...prev, notes: value }))}
@@ -158,20 +243,27 @@ export default function HandoffsPage() {
               />
             </div>
             <Button type="submit" size="sm" disabled={!canSubmit || saving}>
-              {saving ? 'Sending...' : 'Transfer'}
+              {saving ? t('handoffs.sending') : t('handoffs.transfer')}
             </Button>
           </form>
         </ComponentCard>
 
-        <ComponentCard title="Recent transfers" className="lg:col-span-2">
+        <ComponentCard title={t('handoffs.recentTransfers')} className="lg:col-span-2">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  {['Package', 'Tourist', 'Accountant', 'Amount', 'Status', 'Sent At'].map((h) => (
+                  {[
+                    t('common.package'),
+                    t('common.tourist'),
+                    t('handoffs.accountant'),
+                    t('common.amount'),
+                    t('common.status'),
+                    t('handoffs.sentAt'),
+                  ].map((h) => (
                     <th
                       key={h}
-                      className="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300"
+                      className="px-3 py-2 text-start font-medium text-gray-600 dark:text-gray-300"
                     >
                       {h}
                     </th>
@@ -182,7 +274,7 @@ export default function HandoffsPage() {
                 {items.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-8 text-center text-gray-500">
-                      No transfers yet
+                      {t('handoffs.noTransfers')}
                     </td>
                   </tr>
                 ) : (
@@ -190,19 +282,19 @@ export default function HandoffsPage() {
                     <tr key={h.id} className="border-b border-gray-100 dark:border-gray-800">
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">#{h.package_id}</td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                        {h.package?.tourist?.name || '—'}
+                        {h.package?.tourist?.name || t('common.emDash')}
                       </td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                        {h.accountant?.name || '—'}
+                        {h.accountant?.name || t('common.emDash')}
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
-                        {formatCurrency(Number(h.amount))}
+                        {formatDualAmount(Number(h.amount), Number(h.amount_etb || 0))}
                       </td>
                       <td className="px-3 py-2">
                         <StatusLabel status={h.status} />
                       </td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                        {h.sent_at ? new Date(h.sent_at).toLocaleString() : '—'}
+                        {h.sent_at ? new Date(h.sent_at).toLocaleString(locale) : t('common.emDash')}
                       </td>
                     </tr>
                   ))

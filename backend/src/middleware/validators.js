@@ -67,6 +67,24 @@ const handoffValidation = [
   validate,
 ];
 
+const exchangeRateValidation = [
+  body('usd_to_etb').isFloat({ min: 0.0001 }).withMessage('VALIDATION_FAILED'),
+  validate,
+];
+
+const fundReturnValidation = [
+  body('amount_etb').isFloat({ min: 0.01 }).withMessage('VALIDATION_FAILED'),
+  body('package_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('notes').optional({ values: 'falsy' }).isString(),
+  validate,
+];
+
+const settlePackageValidation = [
+  body('action').isIn(['keep', 'return']).withMessage('INVALID_SETTLE_ACTION'),
+  body('notes').optional({ values: 'falsy' }).isString(),
+  validate,
+];
+
 module.exports = {
   loginValidation,
   touristValidation,
@@ -74,4 +92,7 @@ module.exports = {
   parkValidation,
   packageValidation,
   handoffValidation,
+  exchangeRateValidation,
+  fundReturnValidation,
+  settlePackageValidation,
 };

@@ -1,4 +1,6 @@
 import { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import PageMeta from '../common/PageMeta';
 import ComponentCard from '../common/ComponentCard';
 
@@ -30,20 +32,22 @@ export default function PageLayout({ title, description, children, action }: Pag
 export function DataTable({
   headers,
   rows,
-  emptyMessage = 'No records found',
+  emptyMessage,
 }: {
   headers: string[];
   rows: ReactNode[][];
   emptyMessage?: string;
 }) {
+  const { t } = useTranslation();
+
   return (
-    <ComponentCard title="Records">
+    <ComponentCard title={t('common.records')}>
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-700">
               {headers.map((h) => (
-                <th key={h} className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
+                <th key={h} className="px-4 py-3 text-start font-medium text-gray-600 dark:text-gray-300">
                   {h}
                 </th>
               ))}
@@ -53,7 +57,7 @@ export function DataTable({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={headers.length} className="px-4 py-8 text-center text-gray-500">
-                  {emptyMessage}
+                  {emptyMessage ?? t('common.noRecords')}
                 </td>
               </tr>
             ) : (
@@ -83,8 +87,13 @@ export function StatCard({ label, value, color = 'brand' }: { label: string; val
   );
 }
 
-export function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+export function formatCurrency(amount: number, currency: 'USD' | 'ETB' = 'USD') {
+  const locale = i18n.language === 'ar' ? 'ar' : 'en-US';
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+}
+
+export function formatDualAmount(usd: number, etb: number) {
+  return `${formatCurrency(usd, 'USD')} / ${formatCurrency(etb, 'ETB')}`;
 }
 
 export function currentMonth() {

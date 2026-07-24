@@ -11,6 +11,8 @@ const userRoutes = require('./routes/userRoutes');
 const handoffRoutes = require('./routes/handoffRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const packageSpendingRoutes = require('./routes/packageSpendingRoutes');
+const exchangeRateRoutes = require('./routes/exchangeRateRoutes');
+const fundReturnRoutes = require('./routes/fundReturnRoutes');
 
 const app = express();
 
@@ -30,6 +32,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/handoffs', handoffRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/package-spendings', packageSpendingRoutes);
+app.use('/api/exchange-rate', exchangeRateRoutes);
+app.use('/api/fund-returns', fundReturnRoutes);
 
 app.use(errorHandler);
 

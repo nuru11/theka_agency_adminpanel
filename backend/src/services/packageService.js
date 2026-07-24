@@ -5,10 +5,13 @@ const {
   Property,
   Park,
   User,
+  PackageSpending,
   sequelize,
 } = require('../models');
+const { QueryTypes } = require('sequelize');
 const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
+const fundReturnService = require('./fundReturnService');
 
 function computeExpectedCost(accommodationPrice, days) {
   const parksTotal = (days || []).reduce((sum, d) => sum + Number(d.park_price || 0), 0);
@@ -59,8 +62,35 @@ async function assertDriver(id) {
   return driver;
 }
 
+async function getSpendMap() {
+  const rows = await sequelize.query(
+    `
+    SELECT package_id, COALESCE(SUM(amount), 0) AS actual_spend
+    FROM package_spendings
+    GROUP BY package_id
+    `,
+    { type: QueryTypes.SELECT }
+  );
+  const map = {};
+  for (const row of rows) {
+    map[row.package_id] = Number(row.actual_spend || 0);
+  }
+  return map;
+}
+
+function withSpendSummary(pkg, spendMap) {
+  const plain = pkg.toJSON ? pkg.toJSON() : { ...pkg };
+  const expected = Number(plain.expected_cost || 0);
+  const actual_spend = spendMap[plain.id] ?? 0;
+  return {
+    ...plain,
+    actual_spend,
+    variance: Math.round((actual_spend - expected) * 100) / 100,
+  };
+}
+
 async function list() {
-  return TourPackage.findAll({
+  const packages = await TourPackage.findAll({
     include: [
       { model: Tourist, as: 'tourist', attributes: ['id', 'name'] },
       { model: Property, as: 'property', attributes: ['id', 'name'] },
@@ -69,6 +99,8 @@ async function list() {
     ],
     order: [['created_at', 'DESC']],
   });
+  const spendMap = await getSpendMap();
+  return packages.map((pkg) => withSpendSummary(pkg, spendMap));
 }
 
 async function getById(id) {
@@ -86,11 +118,17 @@ async function getById(id) {
           { model: User, as: 'driver', attributes: ['id', 'name'] },
         ],
       },
+      {
+        model: PackageSpending,
+        as: 'spendings',
+        attributes: ['id', 'amount', 'reason', 'created_at'],
+      },
     ],
     order: [[{ model: PackageDay, as: 'days' }, 'day_number', 'ASC']],
   });
   if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-  return pkg;
+  const spendMap = await getSpendMap();
+  return withSpendSummary(pkg, spendMap);
 }
 
 async function create(data, userId) {
@@ -152,4 +190,40 @@ async function create(data, userId) {
   return getById(pkgId);
 }
 
-module.exports = { list, getById, create, computeExpectedCost };
+async function settle(id, data, accountantUser) {
+  const action = data.action;
+  const notes = data.notes || null;
+
+  if (!['keep', 'return'].includes(action)) {
+    throw new AppError('INVALID_SETTLE_ACTION', ERROR_CODES.INVALID_SETTLE_ACTION, 400);
+  }
+
+  const pkg = await TourPackage.findByPk(id);
+  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
+
+  if (pkg.status === 'settled') {
+    throw new AppError('PACKAGE_ALREADY_SETTLED', ERROR_CODES.PACKAGE_ALREADY_SETTLED, 400);
+  }
+
+  let fundReturn = null;
+  const remaining =
+    action === 'return' ? await fundReturnService.getPackageRemainingEtb(id) : 0;
+
+  if (action === 'return' && remaining <= 0) {
+    throw new AppError('NOTHING_TO_RETURN', ERROR_CODES.NOTHING_TO_RETURN, 400);
+  }
+
+  if (action === 'return') {
+    fundReturn = await fundReturnService.create(
+      { amount_etb: remaining, package_id: id, notes },
+      accountantUser
+    );
+  }
+
+  await pkg.update({ status: 'settled' });
+
+  const updated = await getById(id);
+  return { package: updated, fund_return: fundReturn };
+}
+
+module.exports = { list, getById, create, settle, computeExpectedCost };

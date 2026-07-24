@@ -8,6 +8,7 @@ const {
 } = require('../models');
 const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
+const exchangeRateService = require('./exchangeRateService');
 
 const listIncludes = [
   {
@@ -59,13 +60,20 @@ async function create(data, senderId) {
   await assertPackage(package_id);
   await assertAccountant(accountant_id);
 
+  const rate = await exchangeRateService.requireCurrent();
+  const amountUsd = Number(amount);
+  const exchange_rate = Number(rate.usd_to_etb);
+  const amount_etb = exchangeRateService.usdToEtb(amountUsd, exchange_rate);
+
   const handoffId = await sequelize.transaction(async (transaction) => {
     const handoff = await Handoff.create(
       {
         package_id,
         office_admin_id: senderId,
         accountant_id,
-        amount,
+        amount: amountUsd,
+        exchange_rate,
+        amount_etb,
         status: 'pending',
         sent_at: new Date(),
         notes: notes || null,
@@ -96,6 +104,10 @@ async function receive(id, accountantUser) {
     throw new AppError('FORBIDDEN', ERROR_CODES.FORBIDDEN, 403);
   }
 
+  const amountUsd = Number(handoff.amount);
+  const amountEtb = Number(handoff.amount_etb || 0);
+  const exchangeRate = handoff.exchange_rate != null ? Number(handoff.exchange_rate) : null;
+
   await sequelize.transaction(async (transaction) => {
     await handoff.update(
       {
@@ -109,7 +121,10 @@ async function receive(id, accountantUser) {
       {
         user_id: accountantUser.id,
         type: 'credit',
-        amount: handoff.amount,
+        amount: amountUsd,
+        amount_usd: amountUsd,
+        amount_etb: amountEtb,
+        exchange_rate: exchangeRate,
         handoff_id: handoff.id,
         note: `Handoff #${handoff.id} received`,
       },

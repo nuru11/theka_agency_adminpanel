@@ -11,6 +11,7 @@ import ParksPage from "./pages/settings/ParksPage";
 import PackagesPage from "./pages/packages/PackagesPage";
 import HandoffsPage from "./pages/handoffs/HandoffsPage";
 import ReceivedPage from "./pages/handoffs/ReceivedPage";
+import FundReturnsPage from "./pages/handoffs/FundReturnsPage";
 import PackageSpendingPage from "./pages/accountant/PackageSpendingPage";
 
 export default function App() {
@@ -23,23 +24,20 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route index path="/" element={<Dashboard />} />
-          </Route>
-        </Route>
 
-        <Route element={<ProtectedRoute roles={["superAdmin", "officeAdmin"]} />}>
-          <Route element={<AppLayout />}>
-            <Route path="/tourists" element={<TouristsPage />} />
-            <Route path="/settings/properties" element={<PropertiesPage />} />
-            <Route path="/settings/parks" element={<ParksPage />} />
-            <Route path="/packages" element={<PackagesPage />} />
-            <Route path="/handoffs" element={<HandoffsPage />} />
-          </Route>
-        </Route>
+            <Route element={<ProtectedRoute roles={["superAdmin", "officeAdmin"]} />}>
+              <Route path="/tourists" element={<TouristsPage />} />
+              <Route path="/settings/properties" element={<PropertiesPage />} />
+              <Route path="/settings/parks" element={<ParksPage />} />
+              <Route path="/packages" element={<PackagesPage />} />
+              <Route path="/handoffs" element={<HandoffsPage />} />
+            </Route>
 
-        <Route element={<ProtectedRoute roles={["superAdmin", "accountant"]} />}>
-          <Route element={<AppLayout />}>
-            <Route path="/received" element={<ReceivedPage />} />
-            <Route path="/package-spending" element={<PackageSpendingPage />} />
+            <Route element={<ProtectedRoute roles={["superAdmin", "accountant"]} />}>
+              <Route path="/received" element={<ReceivedPage />} />
+              <Route path="/package-spending" element={<PackageSpendingPage />} />
+              <Route path="/fund-returns" element={<FundReturnsPage />} />
+            </Route>
           </Route>
         </Route>
 

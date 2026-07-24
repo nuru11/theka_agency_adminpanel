@@ -7,7 +7,8 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        // 127.0.0.1 avoids Windows localhost IPv6/IPv4 ECONNREFUSED/ECONNRESET
+        target: "http://127.0.0.1:3001",
         changeOrigin: true,
       },
     },

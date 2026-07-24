@@ -87,6 +87,8 @@ export interface TourPackage {
   driver_id: number;
   vehicle_type: VehicleType;
   expected_cost: number;
+  actual_spend?: number;
+  variance?: number;
   status: PackageStatus;
   created_by: number;
   tourist?: { id: number; name: string };
@@ -127,6 +129,8 @@ export interface Handoff {
   office_admin_id: number;
   accountant_id: number;
   amount: number;
+  exchange_rate?: number | null;
+  amount_etb?: number | null;
   status: HandoffStatus;
   sent_at: string;
   received_at?: string | null;
@@ -147,14 +151,54 @@ export interface WalletTransaction {
   user_id: number;
   type: 'credit' | 'debit';
   amount: number;
+  amount_usd?: number | null;
+  amount_etb?: number | null;
+  exchange_rate?: number | null;
   handoff_id?: number | null;
+  package_spending_id?: number | null;
+  fund_return_id?: number | null;
   note?: string | null;
   created_at: string;
 }
 
 export interface WalletSummary {
   balance: number;
+  balance_usd: number;
+  balance_etb: number;
   transactions: WalletTransaction[];
+}
+
+export interface ExchangeRate {
+  id: number;
+  usd_to_etb: number;
+  set_by: number;
+  created_at?: string;
+  setter?: { id: number; name: string };
+}
+
+export type FundReturnStatus = 'pending' | 'received';
+
+export interface FundReturn {
+  id: number;
+  accountant_id: number;
+  package_id?: number | null;
+  amount_usd: number;
+  amount_etb: number;
+  exchange_rate: number;
+  status: FundReturnStatus;
+  notes?: string | null;
+  sent_at: string;
+  received_at?: string | null;
+  received_by?: number | null;
+  package?: {
+    id: number;
+    expected_cost?: number;
+    status?: PackageStatus;
+    tourist_id?: number;
+    tourist?: { id: number; name: string };
+  } | null;
+  accountant?: { id: number; name: string };
+  receiver?: { id: number; name: string } | null;
 }
 
 export type SpendingReason = 'accommodation' | 'park' | 'food' | 'other';

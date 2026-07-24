@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import PageLayout, { DataTable, formatCurrency } from '../../components/common/PageLayout';
 import Button from '../../components/ui/button/Button';
 import {
@@ -57,13 +58,8 @@ const emptyForm = (): PackageForm => ({
   days: [emptyDay(1)],
 });
 
-const VEHICLE_OPTIONS = [
-  { value: 'van', label: 'Van' },
-  { value: 'bus', label: 'Bus' },
-  { value: 'vip', label: 'VIP' },
-];
-
 export default function PackagesPage() {
+  const { t, i18n } = useTranslation();
   const [items, setItems] = useState<TourPackage[]>([]);
   const [tourists, setTourists] = useState<Tourist[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -72,6 +68,15 @@ export default function PackagesPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PackageForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+
+  const vehicleOptions = useMemo(
+    () => [
+      { value: 'van', label: t('packages.van') },
+      { value: 'bus', label: t('packages.bus') },
+      { value: 'vip', label: t('packages.vip') },
+    ],
+    [t]
+  );
 
   const load = async () => {
     const [pkgs, touristRes, propertyRes, parkRes, driverRes] = await Promise.all([
@@ -98,7 +103,7 @@ export default function PackagesPage() {
     return accommodation + parksTotal;
   }, [form.accommodation_price, form.days]);
 
-  const touristOptions = tourists.map((t) => ({ value: String(t.id), label: t.name }));
+  const touristOptions = tourists.map((item) => ({ value: String(item.id), label: item.name }));
   const propertyOptions = properties.map((p) => ({
     value: String(p.id),
     label: `${p.name} (${p.city})`,
@@ -197,50 +202,61 @@ export default function PackagesPage() {
 
   return (
     <PageLayout
-      title="Packages"
-      description="Create and manage tourist packages"
+      title={t('packages.title')}
+      description={t('packages.description')}
       action={
         <Button size="sm" onClick={openCreate}>
-          Create Package
+          {t('packages.create')}
         </Button>
       }
     >
       <DataTable
-        headers={['Tourist', 'People', 'Days', 'Expected Cost', 'Status', 'Created By']}
+        headers={[
+          t('common.tourist'),
+          t('packages.people'),
+          t('packages.days'),
+          t('packages.expectedCost'),
+          t('packages.actualSpend'),
+          t('packages.variance'),
+          t('common.status'),
+          t('packages.createdBy'),
+        ]}
         rows={items.map((pkg) => [
           pkg.tourist?.name || `#${pkg.tourist_id}`,
           String(pkg.people_count),
           String(pkg.days_count),
-          formatCurrency(Number(pkg.expected_cost)),
+          formatCurrency(Number(pkg.expected_cost), 'ETB'),
+          formatCurrency(Number(pkg.actual_spend || 0), 'ETB'),
+          formatCurrency(Number(pkg.variance || 0), 'ETB'),
           pkg.status,
-          pkg.creator?.name || '—',
+          pkg.creator?.name || t('common.emDash'),
         ])}
       />
 
       <Modal isOpen={open} onClose={closeModal} className="max-w-3xl p-6">
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto pe-1">
           <div className="sticky top-0 z-10 -mx-1 mb-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 dark:border-brand-800 dark:bg-gray-800">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Expected cost</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('packages.expectedCostLabel')}</p>
             <p className="text-2xl font-semibold text-brand-600 dark:text-brand-400">
-              {formatCurrency(expectedCost)}
+              {formatCurrency(expectedCost, 'ETB')}
             </p>
           </div>
 
-          <h2 className="text-lg font-semibold">Create Package</h2>
+          <h2 className="text-lg font-semibold">{t('packages.create')}</h2>
 
           <div>
-            <Label>Tourist</Label>
+            <Label>{t('common.tourist')}</Label>
             <Select
-              key={`tourist-${open}`}
+              key={`tourist-${open}-${i18n.language}`}
               options={touristOptions}
-              placeholder="Select tourist"
+              placeholder={t('packages.selectTourist')}
               defaultValue={form.tourist_id}
               onChange={(v) => setForm((prev) => ({ ...prev, tourist_id: v }))}
             />
           </div>
 
           <div>
-            <Label>Number of people</Label>
+            <Label>{t('packages.peopleCount')}</Label>
             <Input
               type="number"
               min="1"
@@ -250,17 +266,17 @@ export default function PackagesPage() {
           </div>
 
           <div>
-            <Label>Accommodation</Label>
+            <Label>{t('packages.accommodation')}</Label>
             <Select
-              key={`property-${open}`}
+              key={`property-${open}-${i18n.language}`}
               options={propertyOptions}
-              placeholder="Select accommodation"
+              placeholder={t('packages.selectAccommodation')}
               defaultValue={form.property_id}
               onChange={onPropertyChange}
             />
           </div>
           <div>
-            <Label>Accommodation price</Label>
+            <Label>{t('packages.accommodationPrice')}</Label>
             <Input
               type="number"
               min="0"
@@ -274,21 +290,21 @@ export default function PackagesPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Driver</Label>
+              <Label>{t('common.driver')}</Label>
               <Select
-                key={`driver-${open}`}
+                key={`driver-${open}-${i18n.language}`}
                 options={driverOptions}
-                placeholder="Select driver"
+                placeholder={t('packages.selectDriver')}
                 defaultValue={form.driver_id}
                 onChange={(v) => setForm((prev) => ({ ...prev, driver_id: v }))}
               />
             </div>
             <div>
-              <Label>Car</Label>
+              <Label>{t('packages.car')}</Label>
               <Select
-                key={`vehicle-${open}`}
-                options={VEHICLE_OPTIONS}
-                placeholder="Select car"
+                key={`vehicle-${open}-${i18n.language}`}
+                options={vehicleOptions}
+                placeholder={t('packages.selectCar')}
                 defaultValue={form.vehicle_type}
                 onChange={(v) =>
                   setForm((prev) => ({ ...prev, vehicle_type: v as VehicleType }))
@@ -299,9 +315,9 @@ export default function PackagesPage() {
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-medium">Days ({form.days.length})</h3>
+              <h3 className="font-medium">{t('packages.daysCount', { count: form.days.length })}</h3>
               <Button type="button" size="sm" variant="outline" onClick={addDay}>
-                Add Day
+                {t('packages.addDay')}
               </Button>
             </div>
             {form.days.map((day) => (
@@ -310,7 +326,7 @@ export default function PackagesPage() {
                 className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
               >
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="font-medium">Day {day.day_number}</h3>
+                  <h3 className="font-medium">{t('packages.dayN', { n: day.day_number })}</h3>
                   <Button
                     type="button"
                     size="sm"
@@ -318,22 +334,22 @@ export default function PackagesPage() {
                     disabled={form.days.length <= 1}
                     onClick={() => removeDay(day.day_number)}
                   >
-                    Remove
+                    {t('common.remove')}
                   </Button>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <Label>Park</Label>
+                    <Label>{t('common.park')}</Label>
                     <Select
-                      key={`park-${open}-${day.day_number}-${form.days.length}`}
+                      key={`park-${open}-${day.day_number}-${form.days.length}-${i18n.language}`}
                       options={parkOptions}
-                      placeholder="Select park"
+                      placeholder={t('packages.selectPark')}
                       defaultValue={day.park_id}
                       onChange={(v) => onParkChange(day.day_number, v)}
                     />
                   </div>
                   <div>
-                    <Label>Park price</Label>
+                    <Label>{t('packages.parkPrice')}</Label>
                     <Input
                       type="number"
                       min="0"
@@ -345,11 +361,11 @@ export default function PackagesPage() {
                     />
                   </div>
                   <div>
-                    <Label>Driver</Label>
+                    <Label>{t('common.driver')}</Label>
                     <Select
-                      key={`day-driver-${open}-${day.day_number}-${form.days.length}`}
+                      key={`day-driver-${open}-${day.day_number}-${form.days.length}-${i18n.language}`}
                       options={driverOptions}
-                      placeholder="Select driver"
+                      placeholder={t('packages.selectDriver')}
                       defaultValue={day.driver_id}
                       onChange={(v) => updateDay(day.day_number, { driver_id: v })}
                     />
@@ -360,7 +376,7 @@ export default function PackagesPage() {
           </div>
 
           <Button type="submit" size="sm" disabled={!canSubmit || saving}>
-            {saving ? 'Saving...' : 'Save Package'}
+            {saving ? t('common.saving') : t('packages.savePackage')}
           </Button>
         </form>
       </Modal>
