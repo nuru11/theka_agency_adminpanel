@@ -38,12 +38,12 @@ async function getById(id) {
   return row;
 }
 
-async function getPendingReturnEtb(userId) {
+async function getPendingReturnUsd(userId) {
   const rows = await FundReturn.findAll({
     where: { accountant_id: userId, status: 'pending' },
-    attributes: ['amount_etb'],
+    attributes: ['amount_usd'],
   });
-  return rows.reduce((sum, r) => sum + Number(r.amount_etb || 0), 0);
+  return rows.reduce((sum, r) => sum + Number(r.amount_usd || 0), 0);
 }
 
 async function create(data, file, userId) {
@@ -69,9 +69,9 @@ async function create(data, file, userId) {
   const amountUsd = exchangeRateService.etbToUsd(amountEtb, exchange_rate);
 
   const wallet = await walletService.getWallet(userId);
-  const pendingEtb = await getPendingReturnEtb(userId);
-  const availableEtb = Math.round((wallet.balance_etb - pendingEtb) * 100) / 100;
-  if (amountEtb > availableEtb) {
+  const pendingUsd = await getPendingReturnUsd(userId);
+  const availableUsd = Math.round((wallet.balance_usd - pendingUsd) * 100) / 100;
+  if (amountUsd > availableUsd) {
     throw new AppError('INSUFFICIENT_WALLET_BALANCE', ERROR_CODES.INSUFFICIENT_WALLET_BALANCE, 400);
   }
 

@@ -7,20 +7,20 @@ import Label from '../../components/form/Label';
 import Input from '../../components/form/input/InputField';
 import Select from '../../components/form/Select';
 import TextArea from '../../components/form/input/TextArea';
-import { fundReturnApi, packageApi, walletApi } from '../../services/thiqaApi';
-import type { FundReturn, TourPackage, WalletSummary } from '../../types';
+import { fundReturnApi, packageApi, walletApi, exchangeRateApi } from '../../services/thiqaApi';
+import type { FundReturn, TourPackage, WalletSummary, ExchangeRate } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/getApiErrorMessage';
 
 type FormState = {
   package_id: string;
-  amount_etb: string;
+  amount_usd: string;
   notes: string;
 };
 
 const emptyForm: FormState = {
   package_id: '',
-  amount_etb: '',
+  amount_usd: '',
   notes: '',
 };
 
@@ -49,6 +49,7 @@ export default function FundReturnsPage() {
   const [items, setItems] = useState<FundReturn[]>([]);
   const [packages, setPackages] = useState<TourPackage[]>([]);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formKey, setFormKey] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -66,10 +67,15 @@ export default function FundReturnsPage() {
 
     if (isAccountant) {
       try {
-        const walletRes = await walletApi.get();
+        const [walletRes, rateRes] = await Promise.all([
+          walletApi.get(),
+          exchangeRateApi.get(),
+        ]);
         setWallet(walletRes.data.data);
+        setRate(rateRes.data.data);
       } catch {
         setWallet(null);
+        setRate(null);
       }
     }
   };
@@ -82,6 +88,12 @@ export default function FundReturnsPage() {
   const history = items.filter((r) => r.status === 'received');
   const locale = i18n.language === 'ar' ? 'ar' : undefined;
 
+  const usdToEtb = rate ? Number(rate.usd_to_etb) : 0;
+  const etbPreview =
+    usdToEtb > 0 && Number(form.amount_usd) > 0
+      ? Math.round(Number(form.amount_usd) * usdToEtb * 100) / 100
+      : 0;
+
   const packageOptions = useMemo(
     () =>
       packages.map((p) => ({
@@ -91,7 +103,7 @@ export default function FundReturnsPage() {
     [packages, t]
   );
 
-  const canSubmit = isAccountant && Number(form.amount_etb) > 0;
+  const canSubmit = isAccountant && Number(form.amount_usd) > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +113,7 @@ export default function FundReturnsPage() {
     setSuccess('');
     try {
       await fundReturnApi.create({
-        amount_etb: Number(form.amount_etb),
+        amount_usd: Number(form.amount_usd),
         package_id: form.package_id ? Number(form.package_id) : null,
         notes: form.notes.trim() || null,
       });
@@ -137,8 +149,8 @@ export default function FundReturnsPage() {
       {isAccountant && (
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <StatCard
-            label={t('fundReturns.walletEtb')}
-            value={formatCurrency(Number(wallet?.balance_etb ?? 0), 'ETB')}
+            label={t('fundReturns.walletUsd')}
+            value={formatCurrency(Number(wallet?.balance_usd ?? wallet?.balance ?? 0), 'USD')}
           />
         </div>
       )}
@@ -161,14 +173,21 @@ export default function FundReturnsPage() {
                 />
               </div>
               <div>
-                <Label>{t('fundReturns.amountEtb')}</Label>
+                <Label>{t('fundReturns.amountUsd')}</Label>
                 <Input
                   type="number"
                   min="0.01"
                   step={0.01}
-                  value={form.amount_etb}
-                  onChange={(e) => setForm((prev) => ({ ...prev, amount_etb: e.target.value }))}
+                  value={form.amount_usd}
+                  onChange={(e) => setForm((prev) => ({ ...prev, amount_usd: e.target.value }))}
                 />
+                {etbPreview > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {t('fundReturns.etbPreview', {
+                      amount: formatCurrency(etbPreview, 'ETB'),
+                    })}
+                  </p>
+                )}
               </div>
               <div>
                 <Label>{t('common.notes')}</Label>

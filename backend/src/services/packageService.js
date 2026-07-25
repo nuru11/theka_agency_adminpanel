@@ -13,9 +13,11 @@ const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
 const fundReturnService = require('./fundReturnService');
 
-function computeExpectedCost(accommodationPrice, days) {
-  const parksTotal = (days || []).reduce((sum, d) => sum + Number(d.park_price || 0), 0);
-  return Number(accommodationPrice || 0) + parksTotal;
+function computeExpectedCost(days) {
+  return (days || []).reduce(
+    (sum, d) => sum + Number(d.accommodation_price || 0) + Number(d.park_price || 0),
+    0
+  );
 }
 
 function validateDays(daysCount, days) {
@@ -100,7 +102,19 @@ async function list() {
     order: [['created_at', 'DESC']],
   });
   const spendMap = await getSpendMap();
-  return packages.map((pkg) => withSpendSummary(pkg, spendMap));
+  const summaries = packages.map((pkg) => withSpendSummary(pkg, spendMap));
+
+  await Promise.all(
+    summaries.map(async (pkg) => {
+      if (pkg.status === 'accountant_received') {
+        pkg.remaining_usd = await fundReturnService.getPackageRemainingUsd(pkg.id);
+      } else {
+        pkg.remaining_usd = 0;
+      }
+    })
+  );
+
+  return summaries;
 }
 
 async function getById(id) {
@@ -115,6 +129,7 @@ async function getById(id) {
         as: 'days',
         include: [
           { model: Park, as: 'park', attributes: ['id', 'name', 'price'] },
+          { model: Property, as: 'property', attributes: ['id', 'name', 'price'] },
           { model: User, as: 'driver', attributes: ['id', 'name'] },
         ],
       },
@@ -136,8 +151,6 @@ async function create(data, userId) {
     tourist_id,
     people_count,
     days_count,
-    property_id,
-    accommodation_price,
     driver_id,
     vehicle_type,
     days,
@@ -146,15 +159,21 @@ async function create(data, userId) {
   validateDays(days_count, days);
 
   await assertTourist(tourist_id);
-  await assertProperty(property_id);
   await assertDriver(driver_id);
 
   for (const day of days) {
+    await assertProperty(day.property_id);
     await assertPark(day.park_id);
     await assertDriver(day.driver_id);
   }
 
-  const expected_cost = computeExpectedCost(accommodation_price, days);
+  const sortedDays = [...days].sort((a, b) => Number(a.day_number) - Number(b.day_number));
+  const property_id = sortedDays[0].property_id;
+  const accommodation_price = sortedDays.reduce(
+    (sum, d) => sum + Number(d.accommodation_price || 0),
+    0
+  );
+  const expected_cost = computeExpectedCost(sortedDays);
 
   const pkgId = await sequelize.transaction(async (transaction) => {
     const pkg = await TourPackage.create(
@@ -174,11 +193,13 @@ async function create(data, userId) {
     );
 
     await PackageDay.bulkCreate(
-      days.map((d) => ({
+      sortedDays.map((d) => ({
         package_id: pkg.id,
         day_number: d.day_number,
         park_id: d.park_id,
         park_price: d.park_price,
+        property_id: d.property_id,
+        accommodation_price: d.accommodation_price,
         driver_id: d.driver_id,
       })),
       { transaction }
@@ -207,7 +228,7 @@ async function settle(id, data, accountantUser) {
 
   let fundReturn = null;
   const remaining =
-    action === 'return' ? await fundReturnService.getPackageRemainingEtb(id) : 0;
+    action === 'return' ? await fundReturnService.getPackageRemainingUsd(id) : 0;
 
   if (action === 'return' && remaining <= 0) {
     throw new AppError('NOTHING_TO_RETURN', ERROR_CODES.NOTHING_TO_RETURN, 400);
@@ -215,7 +236,7 @@ async function settle(id, data, accountantUser) {
 
   if (action === 'return') {
     fundReturn = await fundReturnService.create(
-      { amount_etb: remaining, package_id: id, notes },
+      { amount_usd: remaining, package_id: id, notes },
       accountantUser
     );
   }

@@ -13,6 +13,7 @@ import HandoffsPage from "./pages/handoffs/HandoffsPage";
 import ReceivedPage from "./pages/handoffs/ReceivedPage";
 import FundReturnsPage from "./pages/handoffs/FundReturnsPage";
 import PackageSpendingPage from "./pages/accountant/PackageSpendingPage";
+import MonthlyAnalysisPage from "./pages/reports/MonthlyAnalysisPage";
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/settings/parks" element={<ParksPage />} />
               <Route path="/packages" element={<PackagesPage />} />
               <Route path="/handoffs" element={<HandoffsPage />} />
+              <Route path="/reports/monthly" element={<MonthlyAnalysisPage />} />
             </Route>
 
             <Route element={<ProtectedRoute roles={["superAdmin", "accountant"]} />}>

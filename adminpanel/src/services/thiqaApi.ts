@@ -13,6 +13,7 @@ import type {
   PackageSpending,
   ExchangeRate,
   FundReturn,
+  MonthlyAnalysis,
 } from '../types';
 
 export const authApi = {
@@ -104,8 +105,13 @@ export const exchangeRateApi = {
 
 export const fundReturnApi = {
   list: () => api.get<{ success: boolean; data: FundReturn[] }>('/fund-returns'),
-  create: (data: { amount_etb: number; package_id?: number | null; notes?: string | null }) =>
+  create: (data: { amount_usd: number; package_id?: number | null; notes?: string | null }) =>
     api.post<{ success: boolean; data: FundReturn }>('/fund-returns', data),
   receive: (id: number) =>
     api.patch<{ success: boolean; data: FundReturn }>(`/fund-returns/${id}/receive`),
+};
+
+export const reportsApi = {
+  monthly: (period: string) =>
+    api.get<{ success: boolean; data: MonthlyAnalysis }>(`/reports/monthly?period=${period}`),
 };

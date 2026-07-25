@@ -26,6 +26,8 @@ type DayForm = {
   day_number: number;
   park_id: string;
   park_price: string;
+  property_id: string;
+  accommodation_price: string;
   driver_id: string;
 };
 
@@ -33,8 +35,6 @@ type PackageForm = {
   tourist_id: string;
   people_count: string;
   days_count: string;
-  property_id: string;
-  accommodation_price: string;
   driver_id: string;
   vehicle_type: VehicleType | '';
   days: DayForm[];
@@ -44,6 +44,8 @@ const emptyDay = (day_number: number): DayForm => ({
   day_number,
   park_id: '',
   park_price: '0',
+  property_id: '',
+  accommodation_price: '0',
   driver_id: '',
 });
 
@@ -51,8 +53,6 @@ const emptyForm = (): PackageForm => ({
   tourist_id: '',
   people_count: '1',
   days_count: '1',
-  property_id: '',
-  accommodation_price: '0',
   driver_id: '',
   vehicle_type: '',
   days: [emptyDay(1)],
@@ -98,10 +98,11 @@ export default function PackagesPage() {
   }, []);
 
   const expectedCost = useMemo(() => {
-    const accommodation = Number(form.accommodation_price || 0);
-    const parksTotal = form.days.reduce((sum, d) => sum + Number(d.park_price || 0), 0);
-    return accommodation + parksTotal;
-  }, [form.accommodation_price, form.days]);
+    return form.days.reduce(
+      (sum, d) => sum + Number(d.accommodation_price || 0) + Number(d.park_price || 0),
+      0
+    );
+  }, [form.days]);
 
   const touristOptions = tourists.map((item) => ({ value: String(item.id), label: item.name }));
   const propertyOptions = properties.map((p) => ({
@@ -141,15 +142,6 @@ export default function PackagesPage() {
     });
   };
 
-  const onPropertyChange = (propertyId: string) => {
-    const property = properties.find((p) => String(p.id) === propertyId);
-    setForm((prev) => ({
-      ...prev,
-      property_id: propertyId,
-      accommodation_price: property ? String(property.price) : prev.accommodation_price,
-    }));
-  };
-
   const updateDay = (dayNumber: number, patch: Partial<DayForm>) => {
     setForm((prev) => ({
       ...prev,
@@ -165,13 +157,27 @@ export default function PackagesPage() {
     });
   };
 
+  const onPropertyChange = (dayNumber: number, propertyId: string) => {
+    const property = properties.find((p) => String(p.id) === propertyId);
+    updateDay(dayNumber, {
+      property_id: propertyId,
+      accommodation_price: property
+        ? String(
+            Math.max(
+              0,
+              Number(property.price) - Number(property.commission || 0)
+            )
+          )
+        : '0',
+    });
+  };
+
   const canSubmit =
     !!form.tourist_id &&
-    !!form.property_id &&
     !!form.driver_id &&
     !!form.vehicle_type &&
     Number(form.people_count) >= 1 &&
-    form.days.every((d) => d.park_id && d.driver_id);
+    form.days.every((d) => d.park_id && d.property_id && d.driver_id);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,14 +188,14 @@ export default function PackagesPage() {
         tourist_id: Number(form.tourist_id),
         people_count: Number(form.people_count),
         days_count: Number(form.days_count),
-        property_id: Number(form.property_id),
-        accommodation_price: Number(form.accommodation_price || 0),
         driver_id: Number(form.driver_id),
         vehicle_type: form.vehicle_type as VehicleType,
         days: form.days.map((d) => ({
           day_number: d.day_number,
           park_id: Number(d.park_id),
           park_price: Number(d.park_price || 0),
+          property_id: Number(d.property_id),
+          accommodation_price: Number(d.accommodation_price || 0),
           driver_id: Number(d.driver_id),
         })),
       });
@@ -265,29 +271,6 @@ export default function PackagesPage() {
             />
           </div>
 
-          <div>
-            <Label>{t('packages.accommodation')}</Label>
-            <Select
-              key={`property-${open}-${i18n.language}`}
-              options={propertyOptions}
-              placeholder={t('packages.selectAccommodation')}
-              defaultValue={form.property_id}
-              onChange={onPropertyChange}
-            />
-          </div>
-          <div>
-            <Label>{t('packages.accommodationPrice')}</Label>
-            <Input
-              type="number"
-              min="0"
-              step={0.01}
-              value={form.accommodation_price}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, accommodation_price: e.target.value }))
-              }
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>{t('common.driver')}</Label>
@@ -338,6 +321,28 @@ export default function PackagesPage() {
                   </Button>
                 </div>
                 <div className="space-y-3">
+                  <div>
+                    <Label>{t('packages.accommodation')}</Label>
+                    <Select
+                      key={`property-${open}-${day.day_number}-${form.days.length}-${i18n.language}`}
+                      options={propertyOptions}
+                      placeholder={t('packages.selectAccommodation')}
+                      defaultValue={day.property_id}
+                      onChange={(v) => onPropertyChange(day.day_number, v)}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t('packages.accommodationPrice')}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step={0.01}
+                      value={day.accommodation_price}
+                      onChange={(e) =>
+                        updateDay(day.day_number, { accommodation_price: e.target.value })
+                      }
+                    />
+                  </div>
                   <div>
                     <Label>{t('common.park')}</Label>
                     <Select

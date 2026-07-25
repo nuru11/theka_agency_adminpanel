@@ -72,8 +72,11 @@ export interface PackageDay {
   day_number: number;
   park_id: number;
   park_price: number;
+  property_id: number;
+  accommodation_price: number;
   driver_id: number;
   park?: { id: number; name: string; price?: number };
+  property?: { id: number; name: string; price?: number };
   driver?: { id: number; name: string };
 }
 
@@ -89,6 +92,7 @@ export interface TourPackage {
   expected_cost: number;
   actual_spend?: number;
   variance?: number;
+  remaining_usd?: number;
   status: PackageStatus;
   created_by: number;
   tourist?: { id: number; name: string };
@@ -102,14 +106,14 @@ export interface CreatePackagePayload {
   tourist_id: number;
   people_count: number;
   days_count: number;
-  property_id: number;
-  accommodation_price: number;
   driver_id: number;
   vehicle_type: VehicleType;
   days: Array<{
     day_number: number;
     park_id: number;
     park_price: number;
+    property_id: number;
+    accommodation_price: number;
     driver_id: number;
   }>;
 }
@@ -220,4 +224,45 @@ export interface PackageSpending {
     tourist?: { id: number; name: string };
   };
   creator?: { id: number; name: string };
+}
+
+export type ExpenseByReason = Record<SpendingReason, number>;
+
+export interface MonthlyAnalysisTouristRow {
+  tourist_id: number;
+  name: string;
+  come_date: string;
+  income: number;
+  expected_spend: number;
+  expected_spend_etb: number;
+  expected_income: number;
+  expense: number;
+  expense_etb: number;
+  profit: number;
+}
+
+export interface MonthlyAnalysisDayRow {
+  date: string;
+  income: number;
+  expected_spend: number;
+  expected_income: number;
+  expense: number;
+  net: number;
+}
+
+export interface MonthlyAnalysis {
+  period: string;
+  period_label: string;
+  income: number;
+  expense: number;
+  expense_etb: number;
+  expected_spend: number;
+  expected_spend_etb: number;
+  expected_income: number;
+  net_profit: number;
+  tourist_count: number;
+  expense_by_reason: ExpenseByReason;
+  expense_etb_by_reason: ExpenseByReason;
+  by_tourist: MonthlyAnalysisTouristRow[];
+  by_day: MonthlyAnalysisDayRow[];
 }

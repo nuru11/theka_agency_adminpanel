@@ -13,6 +13,12 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: 0,
       },
+      property_id: { type: DataTypes.INTEGER, allowNull: false },
+      accommodation_price: {
+        type: DataTypes.DECIMAL(12, 2),
+        allowNull: false,
+        defaultValue: 0,
+      },
       driver_id: { type: DataTypes.INTEGER, allowNull: false },
     },
     { tableName: 'package_days', underscored: true }

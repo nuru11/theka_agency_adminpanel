@@ -47,14 +47,14 @@ const packageValidation = [
   body('tourist_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('people_count').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('days_count').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
-  body('property_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
-  body('accommodation_price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
   body('driver_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('vehicle_type').isIn(VEHICLE_TYPES).withMessage('VALIDATION_FAILED'),
   body('days').isArray({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('days.*.day_number').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('days.*.park_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('days.*.park_price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('days.*.property_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('days.*.accommodation_price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
   body('days.*.driver_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   validate,
 ];
@@ -73,7 +73,7 @@ const exchangeRateValidation = [
 ];
 
 const fundReturnValidation = [
-  body('amount_etb').isFloat({ min: 0.01 }).withMessage('VALIDATION_FAILED'),
+  body('amount_usd').isFloat({ min: 0.01 }).withMessage('VALIDATION_FAILED'),
   body('package_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('notes').optional({ values: 'falsy' }).isString(),
   validate,

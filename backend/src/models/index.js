@@ -41,6 +41,8 @@ TourPackage.hasMany(PackageDay, { as: 'days', foreignKey: 'package_id' });
 PackageDay.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });
 
 PackageDay.belongsTo(Park, { as: 'park', foreignKey: 'park_id' });
+PackageDay.belongsTo(Property, { as: 'property', foreignKey: 'property_id' });
+Property.hasMany(PackageDay, { as: 'packageDays', foreignKey: 'property_id' });
 PackageDay.belongsTo(User, { as: 'driver', foreignKey: 'driver_id' });
 
 Handoff.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });

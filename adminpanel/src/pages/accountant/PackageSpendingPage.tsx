@@ -8,8 +8,14 @@ import Input from '../../components/form/input/InputField';
 import Select from '../../components/form/Select';
 import TextArea from '../../components/form/input/TextArea';
 import FileInput from '../../components/form/input/FileInput';
-import { packageSpendingApi, packageApi, walletApi } from '../../services/thiqaApi';
-import type { PackageSpending, TourPackage, SpendingReason, WalletSummary } from '../../types';
+import { packageSpendingApi, packageApi, walletApi, exchangeRateApi } from '../../services/thiqaApi';
+import type {
+  PackageSpending,
+  TourPackage,
+  SpendingReason,
+  WalletSummary,
+  ExchangeRate,
+} from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/getApiErrorMessage';
 
@@ -36,6 +42,7 @@ export default function PackageSpendingPage() {
   const [items, setItems] = useState<PackageSpending[]>([]);
   const [packages, setPackages] = useState<TourPackage[]>([]);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [formKey, setFormKey] = useState(0);
   const [screenshot, setScreenshot] = useState<File | null>(null);
@@ -75,13 +82,19 @@ export default function PackageSpendingPage() {
 
     if (isAccountant) {
       try {
-        const walletRes = await walletApi.get();
+        const [walletRes, rateRes] = await Promise.all([
+          walletApi.get(),
+          exchangeRateApi.get(),
+        ]);
         setWallet(walletRes.data.data);
+        setRate(rateRes.data.data);
       } catch {
         setWallet(null);
+        setRate(null);
       }
     } else {
       setWallet(null);
+      setRate(null);
     }
   };
 
@@ -98,6 +111,12 @@ export default function PackageSpendingPage() {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [screenshot]);
+
+  const usdToEtb = rate ? Number(rate.usd_to_etb) : 0;
+  const usdPreview =
+    usdToEtb > 0 && Number(form.amount) > 0
+      ? Math.round((Number(form.amount) / usdToEtb) * 100) / 100
+      : 0;
 
   const packageOptions = packages.map((p) => ({
     value: String(p.id),
@@ -210,6 +229,13 @@ export default function PackageSpendingPage() {
                     value={form.amount}
                     onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
                   />
+                  {usdPreview > 0 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t('spending.usdPreview', {
+                        amount: formatCurrency(usdPreview, 'USD'),
+                      })}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>{t('spending.reason')}</Label>
@@ -266,6 +292,13 @@ export default function PackageSpendingPage() {
                         {formatCurrency(Number(pkg.expected_cost), 'ETB')} →{' '}
                         {formatCurrency(Number(pkg.actual_spend || 0), 'ETB')}
                       </p>
+                      {Number(pkg.remaining_usd || 0) > 0 && (
+                        <p className="mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+                          {t('packages.remainingUsd', {
+                            amount: formatCurrency(Number(pkg.remaining_usd), 'USD'),
+                          })}
+                        </p>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Button
                           size="sm"
@@ -277,7 +310,7 @@ export default function PackageSpendingPage() {
                         </Button>
                         <Button
                           size="sm"
-                          disabled={settlingId === pkg.id}
+                          disabled={settlingId === pkg.id || Number(pkg.remaining_usd || 0) <= 0}
                           onClick={() => handleSettle(pkg.id, 'return')}
                         >
                           {t('packages.settleReturn')}

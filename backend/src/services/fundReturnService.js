@@ -45,21 +45,21 @@ async function getById(id) {
   return row;
 }
 
-async function getPendingReturnEtb(accountantId) {
+async function getPendingReturnUsd(accountantId) {
   const rows = await FundReturn.findAll({
     where: { accountant_id: accountantId, status: 'pending' },
-    attributes: ['amount_etb'],
+    attributes: ['amount_usd'],
   });
-  return rows.reduce((sum, r) => sum + Number(r.amount_etb || 0), 0);
+  return rows.reduce((sum, r) => sum + Number(r.amount_usd || 0), 0);
 }
 
 async function create(data, accountantUser, options = {}) {
-  const amountEtb = Number(data.amount_etb);
+  const amountUsd = Number(data.amount_usd);
   const package_id = data.package_id ? Number(data.package_id) : null;
   const notes = data.notes || null;
   const { transaction: outerTransaction } = options;
 
-  if (!amountEtb || Number.isNaN(amountEtb) || amountEtb <= 0) {
+  if (!amountUsd || Number.isNaN(amountUsd) || amountUsd <= 0) {
     throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
   }
 
@@ -70,12 +70,12 @@ async function create(data, accountantUser, options = {}) {
 
   const rate = await exchangeRateService.requireCurrent();
   const exchange_rate = Number(rate.usd_to_etb);
-  const amount_usd = exchangeRateService.etbToUsd(amountEtb, exchange_rate);
+  const amount_etb = exchangeRateService.usdToEtb(amountUsd, exchange_rate);
 
   const wallet = await walletService.getWallet(accountantUser.id);
-  const pendingEtb = await getPendingReturnEtb(accountantUser.id);
-  const availableEtb = Math.round((wallet.balance_etb - pendingEtb) * 100) / 100;
-  if (amountEtb > availableEtb) {
+  const pendingUsd = await getPendingReturnUsd(accountantUser.id);
+  const availableUsd = Math.round((wallet.balance_usd - pendingUsd) * 100) / 100;
+  if (amountUsd > availableUsd) {
     throw new AppError('INSUFFICIENT_WALLET_BALANCE', ERROR_CODES.INSUFFICIENT_WALLET_BALANCE, 400);
   }
 
@@ -84,8 +84,8 @@ async function create(data, accountantUser, options = {}) {
       {
         accountant_id: accountantUser.id,
         package_id,
-        amount_usd,
-        amount_etb: amountEtb,
+        amount_usd: amountUsd,
+        amount_etb,
         exchange_rate,
         status: 'pending',
         notes,
@@ -116,7 +116,7 @@ async function receive(id, superAdminUser) {
   const exchangeRate = Number(fundReturn.exchange_rate);
 
   const wallet = await walletService.getWallet(fundReturn.accountant_id);
-  if (amountEtb > wallet.balance_etb) {
+  if (amountUsd > wallet.balance_usd) {
     throw new AppError('INSUFFICIENT_WALLET_BALANCE', ERROR_CODES.INSUFFICIENT_WALLET_BALANCE, 400);
   }
 
@@ -148,26 +148,37 @@ async function receive(id, superAdminUser) {
   return getById(id);
 }
 
-async function getPackageRemainingEtb(packageId) {
+async function getPackageRemainingUsd(packageId) {
   const handoffs = await Handoff.findAll({
     where: { package_id: packageId, status: 'received' },
-    attributes: ['amount_etb'],
+    attributes: ['amount'],
   });
   const spendings = await PackageSpending.findAll({
     where: { package_id: packageId },
-    attributes: ['amount'],
+    attributes: ['id'],
   });
+  const spendingIds = spendings.map((s) => s.id);
+  let spent = 0;
+  if (spendingIds.length > 0) {
+    const txs = await WalletTransaction.findAll({
+      where: {
+        package_spending_id: { [Op.in]: spendingIds },
+        type: 'debit',
+      },
+      attributes: ['amount_usd', 'amount'],
+    });
+    spent = txs.reduce((sum, tx) => sum + Number(tx.amount_usd ?? tx.amount ?? 0), 0);
+  }
   const pendingReturns = await FundReturn.findAll({
     where: {
       package_id: packageId,
       status: { [Op.in]: ['pending', 'received'] },
     },
-    attributes: ['amount_etb'],
+    attributes: ['amount_usd'],
   });
 
-  const funded = handoffs.reduce((sum, h) => sum + Number(h.amount_etb || 0), 0);
-  const spent = spendings.reduce((sum, s) => sum + Number(s.amount || 0), 0);
-  const returned = pendingReturns.reduce((sum, r) => sum + Number(r.amount_etb || 0), 0);
+  const funded = handoffs.reduce((sum, h) => sum + Number(h.amount || 0), 0);
+  const returned = pendingReturns.reduce((sum, r) => sum + Number(r.amount_usd || 0), 0);
 
   return Math.max(0, Math.round((funded - spent - returned) * 100) / 100);
 }
@@ -177,5 +188,6 @@ module.exports = {
   getById,
   create,
   receive,
-  getPackageRemainingEtb,
+  getPendingReturnUsd,
+  getPackageRemainingUsd,
 };
