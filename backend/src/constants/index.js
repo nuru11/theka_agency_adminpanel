@@ -1,4 +1,5 @@
 const USER_ROLES = ['superAdmin', 'officeAdmin', 'accountant', 'employee'];
+const STAFF_ROLES = ['officeAdmin', 'accountant', 'employee'];
 
 const TOURIST_STATUSES = ['expected', 'received', 'departed', 'cancelled'];
 
@@ -25,6 +26,7 @@ const SPENDING_REASONS = ['accommodation', 'park', 'food', 'other'];
 
 module.exports = {
   USER_ROLES,
+  STAFF_ROLES,
   TOURIST_STATUSES,
   PROPERTY_TYPES,
   MASTER_STATUSES,

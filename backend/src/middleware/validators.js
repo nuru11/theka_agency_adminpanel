@@ -5,6 +5,7 @@ const {
   PROPERTY_TYPES,
   MASTER_STATUSES,
   VEHICLE_TYPES,
+  STAFF_ROLES,
 } = require('../constants');
 
 const loginValidation = [
@@ -85,6 +86,41 @@ const settlePackageValidation = [
   validate,
 ];
 
+const userCreateValidation = [
+  body('name').notEmpty().withMessage('VALIDATION_NAME_REQUIRED'),
+  body('username').notEmpty().withMessage('VALIDATION_USERNAME_REQUIRED'),
+  body('password')
+    .notEmpty()
+    .withMessage('VALIDATION_PASSWORD_REQUIRED')
+    .isLength({ min: 6 })
+    .withMessage('VALIDATION_PASSWORD_MIN'),
+  body('phone').optional({ values: 'falsy' }).isString(),
+  body('role').isIn(STAFF_ROLES).withMessage('VALIDATION_INVALID_ROLE'),
+  body('status').optional().isIn(MASTER_STATUSES).withMessage('VALIDATION_FAILED'),
+  body('monthly_salary').optional({ values: 'falsy' }).isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('is_driver').optional().isBoolean().withMessage('VALIDATION_FAILED'),
+  body('vehicle_types').optional({ values: 'falsy' }).isArray().withMessage('VALIDATION_FAILED'),
+  body('vehicle_types.*').optional().isIn(VEHICLE_TYPES).withMessage('VALIDATION_FAILED'),
+  validate,
+];
+
+const userUpdateValidation = [
+  body('name').optional().notEmpty().withMessage('VALIDATION_NAME_REQUIRED'),
+  body('username').optional().notEmpty().withMessage('VALIDATION_USERNAME_REQUIRED'),
+  body('password')
+    .optional({ values: 'falsy' })
+    .isLength({ min: 6 })
+    .withMessage('VALIDATION_PASSWORD_MIN'),
+  body('phone').optional({ values: 'falsy' }).isString(),
+  body('role').optional().isIn(STAFF_ROLES).withMessage('VALIDATION_INVALID_ROLE'),
+  body('status').optional().isIn(MASTER_STATUSES).withMessage('VALIDATION_FAILED'),
+  body('monthly_salary').optional({ values: 'falsy' }).isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('is_driver').optional().isBoolean().withMessage('VALIDATION_FAILED'),
+  body('vehicle_types').optional({ values: 'falsy' }).isArray().withMessage('VALIDATION_FAILED'),
+  body('vehicle_types.*').optional().isIn(VEHICLE_TYPES).withMessage('VALIDATION_FAILED'),
+  validate,
+];
+
 module.exports = {
   loginValidation,
   touristValidation,
@@ -95,4 +131,6 @@ module.exports = {
   exchangeRateValidation,
   fundReturnValidation,
   settlePackageValidation,
+  userCreateValidation,
+  userUpdateValidation,
 };

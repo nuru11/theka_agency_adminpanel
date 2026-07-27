@@ -37,32 +37,69 @@ const allNavItems: NavItem[] = [
   {
     icon: <ListIcon />,
     nameKey: "nav.tourists",
-    path: "/tourists",
-    roles: ["superAdmin", "officeAdmin"],
+    roles: ["superAdmin", "officeAdmin", "employee"],
+    subItems: [
+      {
+        nameKey: "nav.tourists",
+        path: "/tourists",
+        roles: ["superAdmin", "officeAdmin", "employee"],
+      },
+      {
+        nameKey: "nav.touristHistory",
+        path: "/tourists/history",
+        roles: ["superAdmin", "officeAdmin", "employee"],
+      },
+    ],
   },
   {
     icon: <TableIcon />,
-    nameKey: "nav.accommodations",
-    path: "/settings/properties",
+    nameKey: "nav.settings",
     roles: ["superAdmin", "officeAdmin"],
-  },
-  {
-    icon: <TableIcon />,
-    nameKey: "nav.parks",
-    path: "/settings/parks",
-    roles: ["superAdmin", "officeAdmin"],
+    subItems: [
+      {
+        nameKey: "nav.accommodations",
+        path: "/settings/properties",
+        roles: ["superAdmin", "officeAdmin"],
+      },
+      {
+        nameKey: "nav.parks",
+        path: "/settings/parks",
+        roles: ["superAdmin", "officeAdmin"],
+      },
+      {
+        nameKey: "nav.staff",
+        path: "/settings/staff",
+        roles: ["superAdmin", "officeAdmin"],
+      },
+    ],
   },
   {
     icon: <ListIcon />,
     nameKey: "nav.packages",
-    path: "/packages",
-    roles: ["superAdmin", "officeAdmin"],
+    roles: ["superAdmin", "officeAdmin", "accountant", "employee"],
+    subItems: [
+      {
+        nameKey: "nav.packages",
+        path: "/packages",
+        roles: ["superAdmin", "officeAdmin", "employee"],
+      },
+      {
+        nameKey: "nav.packageSpending",
+        path: "/package-spending",
+        roles: ["superAdmin", "accountant"],
+      },
+      {
+        nameKey: "nav.accountantPackages",
+        path: "/accountant-packages",
+        roles: ["superAdmin", "accountant"],
+      },
+    ],
   },
   {
     icon: <GridIcon />,
     nameKey: "nav.monthlyAnalysis",
     path: "/reports/monthly",
-    roles: ["superAdmin", "officeAdmin"],
+    roles: ["superAdmin"],
   },
   {
     icon: <DollarLineIcon />,
@@ -77,11 +114,6 @@ const allNavItems: NavItem[] = [
       {
         nameKey: "nav.received",
         path: "/received",
-        roles: ["superAdmin", "accountant"],
-      },
-      {
-        nameKey: "nav.packageSpending",
-        path: "/package-spending",
         roles: ["superAdmin", "accountant"],
       },
       {

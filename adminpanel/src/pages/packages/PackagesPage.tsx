@@ -21,6 +21,8 @@ import { Modal } from '../../components/ui/modal';
 import Label from '../../components/form/Label';
 import Input from '../../components/form/input/InputField';
 import Select from '../../components/form/Select';
+import { useAuth } from '../../context/AuthContext';
+import { useSubmitLock } from '../../hooks/useSubmitLock';
 
 type DayForm = {
   day_number: number;
@@ -60,6 +62,8 @@ const emptyForm = (): PackageForm => ({
 
 export default function PackagesPage() {
   const { t, i18n } = useTranslation();
+  const { hasRole } = useAuth();
+  const isEmployee = hasRole('employee');
   const [items, setItems] = useState<TourPackage[]>([]);
   const [tourists, setTourists] = useState<Tourist[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -67,7 +71,7 @@ export default function PackagesPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PackageForm>(emptyForm());
-  const [saving, setSaving] = useState(false);
+  const { submitting, run } = useSubmitLock();
 
   const vehicleOptions = useMemo(
     () => [
@@ -181,9 +185,8 @@ export default function PackagesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || saving) return;
-    setSaving(true);
-    try {
+    if (!canSubmit) return;
+    await run(async () => {
       await packageApi.create({
         tourist_id: Number(form.tourist_id),
         people_count: Number(form.people_count),
@@ -201,9 +204,7 @@ export default function PackagesPage() {
       });
       closeModal();
       await load();
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   return (
@@ -222,8 +223,13 @@ export default function PackagesPage() {
           t('packages.people'),
           t('packages.days'),
           t('packages.expectedCost'),
-          t('packages.actualSpend'),
-          t('packages.variance'),
+          ...(isEmployee
+            ? []
+            : [
+                t('packages.actualSpend'),
+                t('packages.amountReceived'),
+                t('packages.variance'),
+              ]),
           t('common.status'),
           t('packages.createdBy'),
         ]}
@@ -232,8 +238,13 @@ export default function PackagesPage() {
           String(pkg.people_count),
           String(pkg.days_count),
           formatCurrency(Number(pkg.expected_cost), 'ETB'),
-          formatCurrency(Number(pkg.actual_spend || 0), 'ETB'),
-          formatCurrency(Number(pkg.variance || 0), 'ETB'),
+          ...(isEmployee
+            ? []
+            : [
+                formatCurrency(Number(pkg.actual_spend || 0), 'ETB'),
+                formatCurrency(Number(pkg.tourist?.amount_received || 0)),
+                formatCurrency(Number(pkg.variance || 0)),
+              ]),
           pkg.status,
           pkg.creator?.name || t('common.emDash'),
         ])}
@@ -331,18 +342,20 @@ export default function PackagesPage() {
                       onChange={(v) => onPropertyChange(day.day_number, v)}
                     />
                   </div>
-                  <div>
-                    <Label>{t('packages.accommodationPrice')}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step={0.01}
-                      value={day.accommodation_price}
-                      onChange={(e) =>
-                        updateDay(day.day_number, { accommodation_price: e.target.value })
-                      }
-                    />
-                  </div>
+                  {!isEmployee && (
+                    <div>
+                      <Label>{t('packages.accommodationPrice')}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step={0.01}
+                        value={day.accommodation_price}
+                        onChange={(e) =>
+                          updateDay(day.day_number, { accommodation_price: e.target.value })
+                        }
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label>{t('common.park')}</Label>
                     <Select
@@ -353,18 +366,20 @@ export default function PackagesPage() {
                       onChange={(v) => onParkChange(day.day_number, v)}
                     />
                   </div>
-                  <div>
-                    <Label>{t('packages.parkPrice')}</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step={0.01}
-                      value={day.park_price}
-                      onChange={(e) =>
-                        updateDay(day.day_number, { park_price: e.target.value })
-                      }
-                    />
-                  </div>
+                  {!isEmployee && (
+                    <div>
+                      <Label>{t('packages.parkPrice')}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step={0.01}
+                        value={day.park_price}
+                        onChange={(e) =>
+                          updateDay(day.day_number, { park_price: e.target.value })
+                        }
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label>{t('common.driver')}</Label>
                     <Select
@@ -380,8 +395,8 @@ export default function PackagesPage() {
             ))}
           </div>
 
-          <Button type="submit" size="sm" disabled={!canSubmit || saving}>
-            {saving ? t('common.saving') : t('packages.savePackage')}
+          <Button type="submit" size="sm" disabled={!canSubmit || submitting}>
+            {submitting ? t('common.saving') : t('packages.savePackage')}
           </Button>
         </form>
       </Modal>

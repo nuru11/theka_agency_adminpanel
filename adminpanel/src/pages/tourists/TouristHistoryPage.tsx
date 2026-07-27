@@ -24,19 +24,6 @@ type TouristForm = {
   amount_received: string;
 };
 
-const emptyForm: TouristForm = {
-  name: '',
-  phone: '',
-  nationality_option: '',
-  nationality_other: '',
-  come_date: '',
-  come_time: '',
-  leave_date: '',
-  leave_time: '',
-  status: 'expected',
-  amount_received: '0',
-};
-
 const NATIONALITY_PRESET_VALUES = [
   'Saudi Arabia',
   'Kuwait',
@@ -79,12 +66,12 @@ function combineDateTime(date: string, time: string): string | null {
   return time ? `${date}T${time}:00` : `${date}T00:00:00`;
 }
 
-export default function TouristsPage() {
+export default function TouristHistoryPage() {
   const { t, i18n } = useTranslation();
   const [items, setItems] = useState<Tourist[]>([]);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<TouristForm>(emptyForm);
+  const [form, setForm] = useState<TouristForm | null>(null);
   const { submitting, run } = useSubmitLock();
 
   const statusOptions = useMemo(
@@ -131,17 +118,11 @@ export default function TouristsPage() {
 
   const load = () =>
     touristApi.list().then((res) =>
-      setItems(res.data.data.filter((t) => t.status === 'expected' || t.status === 'received'))
+      setItems(res.data.data.filter((t) => t.status === 'departed' || t.status === 'cancelled'))
     );
   useEffect(() => {
     load();
   }, []);
-
-  const openCreate = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setOpen(true);
-  };
 
   const openEdit = (tourist: Tourist) => {
     const come = splitDateTime(tourist.come_date);
@@ -166,14 +147,14 @@ export default function TouristsPage() {
   const closeModal = () => {
     setOpen(false);
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form || !editingId || !form.name.trim()) return;
     await run(async () => {
-      const payload = {
+      await touristApi.update(editingId, {
         name: form.name.trim(),
         phone: form.phone.trim() || null,
         nationality: resolveNationalityValue(form),
@@ -181,41 +162,14 @@ export default function TouristsPage() {
         leave_date: combineDateTime(form.leave_date, form.leave_time),
         status: form.status,
         amount_received: Number(form.amount_received || 0),
-      };
-      if (editingId) {
-        await touristApi.update(editingId, payload);
-      } else {
-        await touristApi.create(payload);
-      }
+      });
       closeModal();
       load();
     });
   };
 
-  const markReceived = async (tourist: Tourist) => {
-    if (tourist.status === 'received') return;
-    await touristApi.update(tourist.id, {
-      name: tourist.name,
-      phone: tourist.phone,
-      nationality: tourist.nationality,
-      come_date: tourist.come_date,
-      leave_date: tourist.leave_date,
-      status: 'received',
-      amount_received: Number(tourist.amount_received ?? 0),
-    });
-    load();
-  };
-
   return (
-    <PageLayout
-      title={t('tourists.title')}
-      description={t('tourists.description')}
-      action={
-        <Button size="sm" onClick={openCreate}>
-          {t('tourists.addTourist')}
-        </Button>
-      }
-    >
+    <PageLayout title={t('tourists.historyTitle')} description={t('tourists.historyDescription')}>
       <DataTable
         headers={[
           t('common.name'),
@@ -236,11 +190,6 @@ export default function TouristsPage() {
           statusLabel(item.status),
           formatCurrency(Number(item.amount_received)),
           <div key={item.id} className="flex flex-wrap gap-2">
-            {item.status !== 'received' && (
-              <Button size="sm" onClick={() => markReceived(item)}>
-                {t('tourists.markReceived')}
-              </Button>
-            )}
             <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
               {t('common.edit')}
             </Button>
@@ -248,129 +197,129 @@ export default function TouristsPage() {
         ])}
       />
 
-      <Modal isOpen={open} onClose={closeModal} className="max-w-lg p-6">
-        <h2 className="mb-4 text-lg font-semibold">
-          {editingId ? t('tourists.editTourist') : t('tourists.addTourist')}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label>{t('common.name')}</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>{t('common.phone')}</Label>
-            <Input
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label>{t('tourists.nationality')}</Label>
-            <Select
-              key={`nationality-${editingId ?? 'new'}-${open}-${i18n.language}`}
-              options={nationalityOptions}
-              placeholder={t('tourists.selectNationality')}
-              defaultValue={form.nationality_option}
-              onChange={(v) =>
-                setForm({
-                  ...form,
-                  nationality_option: v,
-                  nationality_other: v === 'other' ? form.nationality_other : '',
-                })
-              }
-            />
-          </div>
-          {form.nationality_option === 'other' && (
+      {form && (
+        <Modal isOpen={open} onClose={closeModal} className="max-w-lg p-6">
+          <h2 className="mb-4 text-lg font-semibold">{t('tourists.editTourist')}</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>{t('tourists.otherNationality')}</Label>
+              <Label>{t('common.name')}</Label>
               <Input
-                placeholder={t('tourists.enterNationality')}
-                value={form.nationality_other}
-                onChange={(e) => setForm({ ...form, nationality_other: e.target.value })}
-              />
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <DatePicker
-                key={`come-date-${editingId ?? 'new'}-${open}`}
-                id={`tourist-come-date-${editingId ?? 'new'}`}
-                label={t('tourists.comeDate')}
-                placeholder={t('tourists.selectComeDate')}
-                defaultDate={form.come_date || undefined}
-                onChange={(_dates, dateStr) =>
-                  setForm((prev) => ({ ...prev, come_date: dateStr }))
-                }
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
             <div>
-              <DatePicker
-                key={`come-time-${editingId ?? 'new'}-${open}`}
-                id={`tourist-come-time-${editingId ?? 'new'}`}
-                label={t('tourists.comeTime')}
-                placeholder={t('tourists.selectComeTime')}
-                timeOnly
-                defaultDate={form.come_time || undefined}
-                onChange={(_dates, timeStr) =>
-                  setForm((prev) => ({ ...prev, come_time: timeStr }))
-                }
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <DatePicker
-                key={`leave-date-${editingId ?? 'new'}-${open}`}
-                id={`tourist-leave-date-${editingId ?? 'new'}`}
-                label={t('tourists.leaveDate')}
-                placeholder={t('tourists.selectLeaveDate')}
-                defaultDate={form.leave_date || undefined}
-                onChange={(_dates, dateStr) =>
-                  setForm((prev) => ({ ...prev, leave_date: dateStr }))
-                }
+              <Label>{t('common.phone')}</Label>
+              <Input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
             </div>
             <div>
-              <DatePicker
-                key={`leave-time-${editingId ?? 'new'}-${open}`}
-                id={`tourist-leave-time-${editingId ?? 'new'}`}
-                label={t('tourists.leaveTime')}
-                placeholder={t('tourists.selectLeaveTime')}
-                timeOnly
-                defaultDate={form.leave_time || undefined}
-                onChange={(_dates, timeStr) =>
-                  setForm((prev) => ({ ...prev, leave_time: timeStr }))
+              <Label>{t('tourists.nationality')}</Label>
+              <Select
+                key={`nationality-${editingId}-${open}-${i18n.language}`}
+                options={nationalityOptions}
+                placeholder={t('tourists.selectNationality')}
+                defaultValue={form.nationality_option}
+                onChange={(v) =>
+                  setForm({
+                    ...form,
+                    nationality_option: v,
+                    nationality_other: v === 'other' ? form.nationality_other : '',
+                  })
                 }
               />
             </div>
-          </div>
-          <div>
-            <Label>{t('common.status')}</Label>
-            <Select
-              key={`status-${editingId ?? 'new'}-${open}-${i18n.language}`}
-              options={statusOptions}
-              defaultValue={form.status}
-              onChange={(v) => setForm({ ...form, status: v as TouristStatus })}
-            />
-          </div>
-          <div>
-            <Label>{t('tourists.amountReceivedLabel')}</Label>
-            <Input
-              type="number"
-              min="0"
-              step={0.01}
-              value={form.amount_received}
-              onChange={(e) => setForm({ ...form, amount_received: e.target.value })}
-            />
-          </div>
-          <Button type="submit" size="sm" disabled={!form.name.trim() || submitting}>
-            {submitting ? t('common.saving') : t('common.save')}
-          </Button>
-        </form>
-      </Modal>
+            {form.nationality_option === 'other' && (
+              <div>
+                <Label>{t('tourists.otherNationality')}</Label>
+                <Input
+                  placeholder={t('tourists.enterNationality')}
+                  value={form.nationality_other}
+                  onChange={(e) => setForm({ ...form, nationality_other: e.target.value })}
+                />
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <DatePicker
+                  key={`come-date-${editingId}-${open}`}
+                  id={`tourist-history-come-date-${editingId}`}
+                  label={t('tourists.comeDate')}
+                  placeholder={t('tourists.selectComeDate')}
+                  defaultDate={form.come_date || undefined}
+                  onChange={(_dates, dateStr) =>
+                    setForm((prev) => (prev ? { ...prev, come_date: dateStr } : prev))
+                  }
+                />
+              </div>
+              <div>
+                <DatePicker
+                  key={`come-time-${editingId}-${open}`}
+                  id={`tourist-history-come-time-${editingId}`}
+                  label={t('tourists.comeTime')}
+                  placeholder={t('tourists.selectComeTime')}
+                  timeOnly
+                  defaultDate={form.come_time || undefined}
+                  onChange={(_dates, timeStr) =>
+                    setForm((prev) => (prev ? { ...prev, come_time: timeStr } : prev))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <DatePicker
+                  key={`leave-date-${editingId}-${open}`}
+                  id={`tourist-history-leave-date-${editingId}`}
+                  label={t('tourists.leaveDate')}
+                  placeholder={t('tourists.selectLeaveDate')}
+                  defaultDate={form.leave_date || undefined}
+                  onChange={(_dates, dateStr) =>
+                    setForm((prev) => (prev ? { ...prev, leave_date: dateStr } : prev))
+                  }
+                />
+              </div>
+              <div>
+                <DatePicker
+                  key={`leave-time-${editingId}-${open}`}
+                  id={`tourist-history-leave-time-${editingId}`}
+                  label={t('tourists.leaveTime')}
+                  placeholder={t('tourists.selectLeaveTime')}
+                  timeOnly
+                  defaultDate={form.leave_time || undefined}
+                  onChange={(_dates, timeStr) =>
+                    setForm((prev) => (prev ? { ...prev, leave_time: timeStr } : prev))
+                  }
+                />
+              </div>
+            </div>
+            <div>
+              <Label>{t('common.status')}</Label>
+              <Select
+                key={`status-${editingId}-${open}-${i18n.language}`}
+                options={statusOptions}
+                defaultValue={form.status}
+                onChange={(v) => setForm({ ...form, status: v as TouristStatus })}
+              />
+            </div>
+            <div>
+              <Label>{t('tourists.amountReceivedLabel')}</Label>
+              <Input
+                type="number"
+                min="0"
+                step={0.01}
+                value={form.amount_received}
+                onChange={(e) => setForm({ ...form, amount_received: e.target.value })}
+              />
+            </div>
+            <Button type="submit" size="sm" disabled={!form.name.trim() || submitting}>
+              {submitting ? t('common.saving') : t('common.save')}
+            </Button>
+          </form>
+        </Modal>
+      )}
     </PageLayout>
   );
 }

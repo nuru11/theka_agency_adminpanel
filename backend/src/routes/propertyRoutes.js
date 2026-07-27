@@ -7,8 +7,8 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get('/', requireRole('superAdmin', 'officeAdmin'), propertyController.list);
-router.get('/:id', requireRole('superAdmin', 'officeAdmin'), propertyController.get);
+router.get('/', requireRole('superAdmin', 'officeAdmin', 'employee'), propertyController.list);
+router.get('/:id', requireRole('superAdmin', 'officeAdmin', 'employee'), propertyController.get);
 router.post('/', requireRole('superAdmin', 'officeAdmin'), propertyValidation, propertyController.create);
 router.put('/:id', requireRole('superAdmin', 'officeAdmin'), propertyValidation, propertyController.update);
 router.delete('/:id', requireRole('superAdmin', 'officeAdmin'), propertyController.remove);

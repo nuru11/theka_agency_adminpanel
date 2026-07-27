@@ -91,15 +91,21 @@ export interface TourPackage {
   vehicle_type: VehicleType;
   expected_cost: number;
   actual_spend?: number;
+  actual_spend_usd?: number;
+  /** Overspend (actual − expected) in USD */
   variance?: number;
+  variance_etb?: number;
+  /** amount_received (USD) − actual_spend converted to USD */
+  net_profit?: number;
   remaining_usd?: number;
   status: PackageStatus;
   created_by: number;
-  tourist?: { id: number; name: string };
+  tourist?: { id: number; name: string; amount_received?: number };
   property?: { id: number; name: string };
   driver?: { id: number; name: string };
   creator?: { id: number; name: string };
   days?: PackageDay[];
+  spendings?: PackageSpending[];
 }
 
 export interface CreatePackagePayload {

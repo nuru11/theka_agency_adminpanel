@@ -7,6 +7,7 @@ const ERROR_CODES = {
   ACCOUNT_INACTIVE: 'Account is inactive. Contact your administrator.',
   FORBIDDEN: 'Forbidden',
   USERNAME_EXISTS: 'Username already exists',
+  USER_IN_USE: 'Cannot delete user who is referenced by other records',
   CANNOT_DEACTIVATE_SELF: 'Cannot deactivate your own account',
   CANNOT_DELETE_SELF: 'Cannot delete your own account',
   VALIDATION_FAILED: 'Validation failed',

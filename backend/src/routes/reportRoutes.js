@@ -6,6 +6,6 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get('/monthly', requireRole('superAdmin', 'officeAdmin'), reportController.monthly);
+router.get('/monthly', requireRole('superAdmin'), reportController.monthly);
 
 module.exports = router;

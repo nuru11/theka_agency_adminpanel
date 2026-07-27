@@ -14,6 +14,7 @@ import type {
   ExchangeRate,
   FundReturn,
   MonthlyAnalysis,
+  MasterStatus,
 } from '../types';
 
 export const authApi = {
@@ -56,6 +57,26 @@ export const driversApi = {
 
 export const accountantsApi = {
   list: () => api.get<{ success: boolean; data: Accountant[] }>('/users/accountants'),
+};
+
+export type StaffPayload = {
+  name: string;
+  username: string;
+  password?: string;
+  phone?: string | null;
+  role: 'officeAdmin' | 'accountant' | 'employee';
+  status?: MasterStatus;
+  monthly_salary?: number | null;
+  is_driver?: boolean;
+  vehicle_types?: string[] | null;
+};
+
+export const usersApi = {
+  list: () => api.get<{ success: boolean; data: User[] }>('/users'),
+  create: (data: StaffPayload) => api.post<{ success: boolean; data: User }>('/users', data),
+  update: (id: number, data: Partial<StaffPayload>) =>
+    api.put<{ success: boolean; data: User }>(`/users/${id}`, data),
+  remove: (id: number) => api.delete<{ success: boolean; message: string }>(`/users/${id}`),
 };
 
 export const packageApi = {

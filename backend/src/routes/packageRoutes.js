@@ -7,9 +7,9 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get('/', requireRole('superAdmin', 'officeAdmin', 'accountant'), packageController.list);
-router.get('/:id', requireRole('superAdmin', 'officeAdmin', 'accountant'), packageController.get);
-router.post('/', requireRole('superAdmin', 'officeAdmin'), packageValidation, packageController.create);
+router.get('/', requireRole('superAdmin', 'officeAdmin', 'accountant', 'employee'), packageController.list);
+router.get('/:id', requireRole('superAdmin', 'officeAdmin', 'accountant', 'employee'), packageController.get);
+router.post('/', requireRole('superAdmin', 'officeAdmin', 'employee'), packageValidation, packageController.create);
 router.post(
   '/:id/settle',
   requireRole('accountant'),

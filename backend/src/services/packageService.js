@@ -12,6 +12,7 @@ const { QueryTypes } = require('sequelize');
 const AppError = require('../utils/AppError');
 const ERROR_CODES = require('../constants/errorCodes');
 const fundReturnService = require('./fundReturnService');
+const exchangeRateService = require('./exchangeRateService');
 
 function computeExpectedCost(days) {
   return (days || []).reduce(
@@ -80,29 +81,47 @@ async function getSpendMap() {
   return map;
 }
 
-function withSpendSummary(pkg, spendMap) {
+function withSpendSummary(pkg, spendMap, usdToEtbRate) {
   const plain = pkg.toJSON ? pkg.toJSON() : { ...pkg };
   const expected = Number(plain.expected_cost || 0);
   const actual_spend = spendMap[plain.id] ?? 0;
+  const variance_etb = Math.round((actual_spend - expected) * 100) / 100;
+  const variance = usdToEtbRate
+    ? exchangeRateService.etbToUsd(variance_etb, usdToEtbRate)
+    : 0;
+  const amount_received = Number(plain.tourist?.amount_received || 0);
+  const actual_spend_usd = usdToEtbRate
+    ? exchangeRateService.etbToUsd(actual_spend, usdToEtbRate)
+    : 0;
+  const net_profit = usdToEtbRate
+    ? Math.round((amount_received - actual_spend_usd) * 100) / 100
+    : 0;
   return {
     ...plain,
     actual_spend,
-    variance: Math.round((actual_spend - expected) * 100) / 100,
+    actual_spend_usd,
+    variance_etb,
+    variance,
+    net_profit,
   };
 }
 
 async function list() {
   const packages = await TourPackage.findAll({
     include: [
-      { model: Tourist, as: 'tourist', attributes: ['id', 'name'] },
+      { model: Tourist, as: 'tourist', attributes: ['id', 'name', 'amount_received'] },
       { model: Property, as: 'property', attributes: ['id', 'name'] },
       { model: User, as: 'driver', attributes: ['id', 'name'] },
       { model: User, as: 'creator', attributes: ['id', 'name'] },
     ],
     order: [['created_at', 'DESC']],
   });
-  const spendMap = await getSpendMap();
-  const summaries = packages.map((pkg) => withSpendSummary(pkg, spendMap));
+  const [spendMap, rate] = await Promise.all([
+    getSpendMap(),
+    exchangeRateService.getCurrent(),
+  ]);
+  const usdToEtbRate = rate ? Number(rate.usd_to_etb) : 0;
+  const summaries = packages.map((pkg) => withSpendSummary(pkg, spendMap, usdToEtbRate));
 
   await Promise.all(
     summaries.map(async (pkg) => {
@@ -120,7 +139,7 @@ async function list() {
 async function getById(id) {
   const pkg = await TourPackage.findByPk(id, {
     include: [
-      { model: Tourist, as: 'tourist', attributes: ['id', 'name'] },
+      { model: Tourist, as: 'tourist', attributes: ['id', 'name', 'amount_received'] },
       { model: Property, as: 'property', attributes: ['id', 'name', 'price'] },
       { model: User, as: 'driver', attributes: ['id', 'name'] },
       { model: User, as: 'creator', attributes: ['id', 'name'] },
@@ -136,14 +155,30 @@ async function getById(id) {
       {
         model: PackageSpending,
         as: 'spendings',
-        attributes: ['id', 'amount', 'reason', 'created_at'],
+        attributes: [
+          'id',
+          'amount',
+          'reason',
+          'notes',
+          'screenshot_path',
+          'created_at',
+          'created_by',
+        ],
+        include: [{ model: User, as: 'creator', attributes: ['id', 'name'] }],
       },
     ],
-    order: [[{ model: PackageDay, as: 'days' }, 'day_number', 'ASC']],
+    order: [
+      [{ model: PackageDay, as: 'days' }, 'day_number', 'ASC'],
+      [{ model: PackageSpending, as: 'spendings' }, 'created_at', 'DESC'],
+    ],
   });
   if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
-  const spendMap = await getSpendMap();
-  return withSpendSummary(pkg, spendMap);
+  const [spendMap, rate] = await Promise.all([
+    getSpendMap(),
+    exchangeRateService.getCurrent(),
+  ]);
+  const usdToEtbRate = rate ? Number(rate.usd_to_etb) : 0;
+  return withSpendSummary(pkg, spendMap, usdToEtbRate);
 }
 
 async function create(data, userId) {
