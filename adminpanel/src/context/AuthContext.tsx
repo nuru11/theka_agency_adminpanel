@@ -72,8 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const res = await authApi.login(username, password);
-    const { token, user: loggedInUser } = res.data.data;
-    if (!loggedInUser?.role || !USER_ROLES.includes(loggedInUser.role)) {
+    const payload = res.data?.data;
+    if (!payload?.token || !payload?.user) {
+      throw new Error('Invalid login response');
+    }
+    const { token, user: loggedInUser } = payload;
+    if (!loggedInUser.role || !USER_ROLES.includes(loggedInUser.role)) {
       throw new Error('Invalid user role');
     }
     localStorage.setItem('thiqa_token', token);

@@ -9,9 +9,9 @@ import PageLayout, {
 import Label from '../../components/form/Label';
 import Input from '../../components/form/input/InputField';
 import { reportsApi } from '../../services/thiqaApi';
-import type { MonthlyAnalysis, SpendingReason } from '../../types';
+import type { BuiltinSpendingReason, MonthlyAnalysis } from '../../types';
 
-const SPEND_REASONS: SpendingReason[] = ['accommodation', 'park', 'food', 'other'];
+const SPEND_REASONS: BuiltinSpendingReason[] = ['accommodation', 'park', 'food', 'other'];
 
 function formatPeriodLabel(period: string, locale: string): string {
   const [yearStr, monthStr] = period.split('-');

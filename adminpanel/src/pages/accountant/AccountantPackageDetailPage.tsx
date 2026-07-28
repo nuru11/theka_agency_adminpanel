@@ -47,7 +47,7 @@ export default function AccountantPackageDetailPage() {
       } catch (err) {
         if (!cancelled) {
           setPkg(null);
-          setError(getApiErrorMessage(err, t('accountantPackages.loadError')));
+          setError(getApiErrorMessage(err, t, 'accountantPackages.loadError'));
         }
       } finally {
         if (!cancelled) setLoading(false);

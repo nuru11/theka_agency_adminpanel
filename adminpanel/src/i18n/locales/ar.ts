@@ -1,8 +1,5 @@
 const ar = {
   auth: {
-    backToDashboard: 'العودة إلى لوحة التحكم',
-    demoHint:
-      'تجريبي: superadmin / officeadmin / accountant / employee — كلمة المرور: admin123',
     invalidCredentials: 'اسم المستخدم أو كلمة المرور غير صحيحة',
     password: 'كلمة المرور',
     passwordPlaceholder: 'أدخل كلمة المرور',
@@ -12,7 +9,7 @@ const ar = {
     signingIn: 'جاري تسجيل الدخول...',
     tagline: 'وكالة ثقة — السفر والسياحة',
     username: 'اسم المستخدم',
-    usernamePlaceholder: 'superadmin',
+    usernamePlaceholder: 'أدخل اسم المستخدم',
   },
   common: {
     actions: 'إجراءات',

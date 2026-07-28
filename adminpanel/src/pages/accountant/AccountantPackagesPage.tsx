@@ -23,7 +23,7 @@ export default function AccountantPackagesPage() {
         const res = await packageApi.list();
         if (!cancelled) setItems(res.data.data);
       } catch (err) {
-        if (!cancelled) setError(getApiErrorMessage(err, t('accountantPackages.loadError')));
+        if (!cancelled) setError(getApiErrorMessage(err, t, 'accountantPackages.loadError'));
       } finally {
         if (!cancelled) setLoading(false);
       }

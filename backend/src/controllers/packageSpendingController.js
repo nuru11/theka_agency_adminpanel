@@ -30,16 +30,14 @@ async function screenshot(req, res, next) {
     }
 
     const ext = path.extname(filePath).toLowerCase();
-    const type =
-      ext === '.png'
-        ? 'image/png'
-        : ext === '.webp'
-          ? 'image/webp'
-          : ext === '.gif'
-            ? 'image/gif'
-            : 'image/jpeg';
-
-    res.setHeader('Content-Type', type);
+    const typeByExt = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+    };
+    res.setHeader('Content-Type', typeByExt[ext] || 'image/jpeg');
     fs.createReadStream(filePath).pipe(res);
   } catch (err) {
     next(err);

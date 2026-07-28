@@ -1,8 +1,5 @@
 const en = {
   auth: {
-    backToDashboard: 'Back to dashboard',
-    demoHint:
-      'Demo: superadmin / officeadmin / accountant / employee — password: admin123',
     invalidCredentials: 'Invalid username or password',
     password: 'Password',
     passwordPlaceholder: 'Enter your password',
@@ -13,7 +10,7 @@ const en = {
     signingIn: 'Signing in...',
     tagline: 'Thiqa Agency — Travel & Tourism',
     username: 'Username',
-    usernamePlaceholder: 'superadmin',
+    usernamePlaceholder: 'Enter your username',
   },
   common: {
     actions: 'Actions',

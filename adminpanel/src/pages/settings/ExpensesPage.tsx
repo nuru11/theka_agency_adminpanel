@@ -111,7 +111,7 @@ export default function ExpensesPage() {
   return (
     <PageLayout
       title={t('expenses.title')}
-      description={t('expenses.description')}
+      // description={t('expenses.description')}
       action={
         <Button size="sm" onClick={openCreate}>
           {t('expenses.add')}

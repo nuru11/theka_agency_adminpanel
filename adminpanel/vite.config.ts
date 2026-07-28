@@ -8,7 +8,8 @@ export default defineConfig({
     proxy: {
       "/api": {
         // 127.0.0.1 avoids Windows localhost IPv6/IPv4 ECONNREFUSED/ECONNRESET
-        target: "http://127.0.0.1:3001",
+        // target: "http://127.0.0.1:3001",
+        target: "https://thiqaapi.lyanethiopia.com",
         changeOrigin: true,
       },
     },

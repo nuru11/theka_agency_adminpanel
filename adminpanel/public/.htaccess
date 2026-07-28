@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Leave API requests alone (reverse proxy or separate host)
+  RewriteRule ^api/ - [L]
+
+  # Don't rewrite files or directories that exist
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+
+  # Fallback to index.html for client-side routes
+  RewriteRule ^ index.html [L]
+</IfModule>
