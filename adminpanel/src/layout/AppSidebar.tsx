@@ -51,33 +51,7 @@ const allNavItems: NavItem[] = [
       },
     ],
   },
-  {
-    icon: <TableIcon />,
-    nameKey: "nav.settings",
-    roles: ["superAdmin", "officeAdmin"],
-    subItems: [
-      {
-        nameKey: "nav.accommodations",
-        path: "/settings/properties",
-        roles: ["superAdmin", "officeAdmin"],
-      },
-      {
-        nameKey: "nav.parks",
-        path: "/settings/parks",
-        roles: ["superAdmin", "officeAdmin"],
-      },
-      {
-        nameKey: "nav.expenses",
-        path: "/settings/expenses",
-        roles: ["superAdmin", "officeAdmin"],
-      },
-      {
-        nameKey: "nav.staff",
-        path: "/settings/staff",
-        roles: ["superAdmin", "officeAdmin"],
-      },
-    ],
-  },
+  
   {
     icon: <ListIcon />,
     nameKey: "nav.packages",
@@ -105,12 +79,7 @@ const allNavItems: NavItem[] = [
       },
     ],
   },
-  {
-    icon: <GridIcon />,
-    nameKey: "nav.monthlyAnalysis",
-    path: "/reports/monthly",
-    roles: ["superAdmin"],
-  },
+  
   {
     icon: <DollarLineIcon />,
     nameKey: "nav.accountant",
@@ -130,6 +99,41 @@ const allNavItems: NavItem[] = [
         nameKey: "nav.fundReturns",
         path: "/fund-returns",
         roles: ["superAdmin", "accountant"],
+      },
+    ],
+  },
+
+  {
+    icon: <GridIcon />,
+    nameKey: "nav.monthlyAnalysis",
+    path: "/reports/monthly",
+    roles: ["superAdmin"],
+  },
+
+  {
+    icon: <TableIcon />,
+    nameKey: "nav.settings",
+    roles: ["superAdmin", "officeAdmin"],
+    subItems: [
+      {
+        nameKey: "nav.accommodations",
+        path: "/settings/properties",
+        roles: ["superAdmin", "officeAdmin"],
+      },
+      {
+        nameKey: "nav.parks",
+        path: "/settings/parks",
+        roles: ["superAdmin", "officeAdmin"],
+      },
+      {
+        nameKey: "nav.expenses",
+        path: "/settings/expenses",
+        roles: ["superAdmin", "officeAdmin"],
+      },
+      {
+        nameKey: "nav.staff",
+        path: "/settings/staff",
+        roles: ["superAdmin", "officeAdmin"],
       },
     ],
   },

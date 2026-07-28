@@ -52,8 +52,16 @@ const en = {
     yes: 'Yes',
   },
   dashboard: {
+    activeTourists: 'Active tourists',
     description: 'Welcome to Thiqa Agency admin panel',
+    loadError: 'Some dashboard data could not be loaded.',
+    monthTourists: 'Tourists this month',
+    openPackages: 'Open packages',
+    pendingFundReturns: 'Pending fund returns',
+    pendingHandoffs: 'Pending handoffs',
+    thisMonth: 'This month',
     title: 'Dashboard',
+    viewMonthlyAnalysis: 'View monthly analysis',
   },
   errors: {
     ACCOUNTANT_NOT_FOUND: 'Accountant not found',

@@ -51,8 +51,16 @@ const ar = {
     yes: 'نعم',
   },
   dashboard: {
+    activeTourists: 'السياح النشطون',
     description: 'مرحباً بك في لوحة إدارة وكالة ثقة',
+    loadError: 'تعذر تحميل بعض بيانات لوحة التحكم.',
+    monthTourists: 'سياح هذا الشهر',
+    openPackages: 'الباقات المفتوحة',
+    pendingFundReturns: 'مردودات الأموال المعلقة',
+    pendingHandoffs: 'التسليمات المعلقة',
+    thisMonth: 'هذا الشهر',
     title: 'لوحة التحكم',
+    viewMonthlyAnalysis: 'عرض التحليل الشهري',
   },
   errors: {
     ACCOUNTANT_NOT_FOUND: 'المحاسب غير موجود',
