@@ -36,4 +36,13 @@ async function settle(req, res, next) {
   }
 }
 
-module.exports = { list, get, create, settle };
+async function markDone(req, res, next) {
+  try {
+    const data = await packageService.markDone(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { list, get, create, settle, markDone };

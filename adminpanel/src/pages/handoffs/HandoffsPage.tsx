@@ -88,14 +88,16 @@ export default function HandoffsPage() {
       ? Math.round(Number(form.amount) * usdToEtb * 100) / 100
       : 0;
 
-  const packageOptions = packages.map((p) => ({
-    value: String(p.id),
-    label: t('handoffs.packageOption', {
-      id: p.id,
-      name: p.tourist?.name || t('handoffs.touristFallback'),
-      cost: formatCurrency(Number(p.expected_cost), 'ETB'),
-    }),
-  }));
+  const packageOptions = packages
+    .filter((p) => p.status !== 'done' && p.status !== 'settled')
+    .map((p) => ({
+      value: String(p.id),
+      label: t('handoffs.packageOption', {
+        id: p.id,
+        name: p.tourist?.name || t('handoffs.touristFallback'),
+        cost: formatCurrency(Number(p.expected_cost), 'ETB'),
+      }),
+    }));
 
   const accountantOptions = accountants.map((a) => ({
     value: String(a.id),

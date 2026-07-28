@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import PageLayout, { DataTable, formatCurrency } from '../../components/common/PageLayout';
@@ -33,6 +33,11 @@ export default function AccountantPackagesPage() {
     };
   }, [t]);
 
+  const activePackages = useMemo(
+    () => items.filter((pkg) => pkg.status !== 'done' && pkg.status !== 'settled'),
+    [items]
+  );
+
   return (
     <PageLayout
       title={t('accountantPackages.title')}
@@ -52,7 +57,7 @@ export default function AccountantPackagesPage() {
             t('common.status'),
             t('common.actions'),
           ]}
-          rows={items.map((pkg) => {
+          rows={activePackages.map((pkg) => {
             const expected = Number(pkg.expected_cost || 0);
             const actual = Number(pkg.actual_spend || 0);
             const remaining = Math.round((expected - actual) * 100) / 100;

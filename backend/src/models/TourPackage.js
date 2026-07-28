@@ -31,7 +31,8 @@ module.exports = (sequelize) => {
           'ready_for_handoff',
           'sent_to_accountant',
           'accountant_received',
-          'settled'
+          'settled',
+          'done'
         ),
         allowNull: false,
         defaultValue: 'active',

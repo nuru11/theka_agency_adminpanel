@@ -11,7 +11,7 @@ module.exports = (sequelize) => {
         allowNull: false,
       },
       reason: {
-        type: DataTypes.ENUM('accommodation', 'park', 'food', 'other'),
+        type: DataTypes.STRING(150),
         allowNull: false,
       },
       screenshot_path: { type: DataTypes.STRING(500), allowNull: false },

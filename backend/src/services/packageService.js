@@ -1,9 +1,11 @@
 const {
   TourPackage,
   PackageDay,
+  PackageExpense,
   Tourist,
   Property,
   Park,
+  Expense,
   User,
   PackageSpending,
   sequelize,
@@ -14,11 +16,13 @@ const ERROR_CODES = require('../constants/errorCodes');
 const fundReturnService = require('./fundReturnService');
 const exchangeRateService = require('./exchangeRateService');
 
-function computeExpectedCost(days) {
-  return (days || []).reduce(
+function computeExpectedCost(days, expenses) {
+  const daysTotal = (days || []).reduce(
     (sum, d) => sum + Number(d.accommodation_price || 0) + Number(d.park_price || 0),
     0
   );
+  const expensesTotal = (expenses || []).reduce((sum, e) => sum + Number(e.price || 0), 0);
+  return daysTotal + expensesTotal;
 }
 
 function validateDays(daysCount, days) {
@@ -36,6 +40,13 @@ function validateDays(daysCount, days) {
 async function assertTourist(id) {
   const tourist = await Tourist.findByPk(id);
   if (!tourist) throw new AppError('TOURIST_NOT_FOUND', ERROR_CODES.TOURIST_NOT_FOUND, 404);
+  if (tourist.status === 'departed' || tourist.status === 'cancelled') {
+    throw new AppError('TOURIST_NOT_AVAILABLE', ERROR_CODES.TOURIST_NOT_AVAILABLE, 400);
+  }
+  const existingPackage = await TourPackage.findOne({ where: { tourist_id: id } });
+  if (existingPackage) {
+    throw new AppError('TOURIST_HAS_PACKAGE', ERROR_CODES.TOURIST_HAS_PACKAGE, 400);
+  }
   return tourist;
 }
 
@@ -57,12 +68,40 @@ async function assertPark(id) {
   return park;
 }
 
+async function assertExpense(id) {
+  const expense = await Expense.findByPk(id);
+  if (!expense) throw new AppError('EXPENSE_NOT_FOUND', ERROR_CODES.EXPENSE_NOT_FOUND, 404);
+  if (expense.status === 'inactive') {
+    throw new AppError('EXPENSE_INACTIVE', ERROR_CODES.EXPENSE_INACTIVE, 400);
+  }
+  return expense;
+}
+
 async function assertDriver(id) {
   const driver = await User.findOne({
     where: { id, role: 'employee', is_driver: true, status: 'active' },
   });
   if (!driver) throw new AppError('DRIVER_NOT_FOUND', ERROR_CODES.DRIVER_NOT_FOUND, 404);
   return driver;
+}
+
+function normalizeExpenses(expenses) {
+  if (expenses == null) return [];
+  if (!Array.isArray(expenses)) {
+    throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
+  }
+  const seen = new Set();
+  for (const item of expenses) {
+    const expenseId = Number(item.expense_id);
+    if (!expenseId) {
+      throw new AppError('EXPENSE_ID_REQUIRED', ERROR_CODES.EXPENSE_ID_REQUIRED, 400);
+    }
+    if (seen.has(expenseId)) {
+      throw new AppError('DUPLICATE_EXPENSE', ERROR_CODES.DUPLICATE_EXPENSE, 400);
+    }
+    seen.add(expenseId);
+  }
+  return expenses;
 }
 
 async function getSpendMap() {
@@ -153,6 +192,11 @@ async function getById(id) {
         ],
       },
       {
+        model: PackageExpense,
+        as: 'expenses',
+        include: [{ model: Expense, as: 'expense', attributes: ['id', 'name', 'price'] }],
+      },
+      {
         model: PackageSpending,
         as: 'spendings',
         attributes: [
@@ -169,6 +213,7 @@ async function getById(id) {
     ],
     order: [
       [{ model: PackageDay, as: 'days' }, 'day_number', 'ASC'],
+      [{ model: PackageExpense, as: 'expenses' }, 'id', 'ASC'],
       [{ model: PackageSpending, as: 'spendings' }, 'created_at', 'DESC'],
     ],
   });
@@ -189,9 +234,11 @@ async function create(data, userId) {
     driver_id,
     vehicle_type,
     days,
+    expenses,
   } = data;
 
   validateDays(days_count, days);
+  const selectedExpenses = normalizeExpenses(expenses);
 
   await assertTourist(tourist_id);
   await assertDriver(driver_id);
@@ -202,13 +249,17 @@ async function create(data, userId) {
     await assertDriver(day.driver_id);
   }
 
+  for (const item of selectedExpenses) {
+    await assertExpense(item.expense_id);
+  }
+
   const sortedDays = [...days].sort((a, b) => Number(a.day_number) - Number(b.day_number));
   const property_id = sortedDays[0].property_id;
   const accommodation_price = sortedDays.reduce(
     (sum, d) => sum + Number(d.accommodation_price || 0),
     0
   );
-  const expected_cost = computeExpectedCost(sortedDays);
+  const expected_cost = computeExpectedCost(sortedDays, selectedExpenses);
 
   const pkgId = await sequelize.transaction(async (transaction) => {
     const pkg = await TourPackage.create(
@@ -240,6 +291,17 @@ async function create(data, userId) {
       { transaction }
     );
 
+    if (selectedExpenses.length) {
+      await PackageExpense.bulkCreate(
+        selectedExpenses.map((e) => ({
+          package_id: pkg.id,
+          expense_id: e.expense_id,
+          price: e.price,
+        })),
+        { transaction }
+      );
+    }
+
     return pkg.id;
   });
 
@@ -259,6 +321,9 @@ async function settle(id, data, accountantUser) {
 
   if (pkg.status === 'settled') {
     throw new AppError('PACKAGE_ALREADY_SETTLED', ERROR_CODES.PACKAGE_ALREADY_SETTLED, 400);
+  }
+  if (pkg.status === 'done') {
+    throw new AppError('PACKAGE_ALREADY_DONE', ERROR_CODES.PACKAGE_ALREADY_DONE, 400);
   }
 
   let fundReturn = null;
@@ -282,4 +347,16 @@ async function settle(id, data, accountantUser) {
   return { package: updated, fund_return: fundReturn };
 }
 
-module.exports = { list, getById, create, settle, computeExpectedCost };
+async function markDone(id) {
+  const pkg = await TourPackage.findByPk(id);
+  if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
+
+  if (pkg.status === 'settled' || pkg.status === 'done') {
+    throw new AppError('PACKAGE_ALREADY_DONE', ERROR_CODES.PACKAGE_ALREADY_DONE, 400);
+  }
+
+  await pkg.update({ status: 'done' });
+  return getById(id);
+}
+
+module.exports = { list, getById, create, settle, markDone, computeExpectedCost };

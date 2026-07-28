@@ -16,5 +16,6 @@ router.post(
   settlePackageValidation,
   packageController.settle
 );
+router.post('/:id/done', requireRole('superAdmin', 'officeAdmin'), packageController.markDone);
 
 module.exports = router;

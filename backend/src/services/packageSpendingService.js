@@ -6,6 +6,7 @@ const {
   User,
   WalletTransaction,
   FundReturn,
+  Expense,
   sequelize,
 } = require('../models');
 const AppError = require('../utils/AppError');
@@ -46,23 +47,42 @@ async function getPendingReturnUsd(userId) {
   return rows.reduce((sum, r) => sum + Number(r.amount_usd || 0), 0);
 }
 
+async function assertValidReason(reason) {
+  if (!reason || typeof reason !== 'string') {
+    throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
+  }
+  const trimmed = reason.trim();
+  if (!trimmed) {
+    throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
+  }
+  if (SPENDING_REASONS.includes(trimmed)) {
+    return trimmed;
+  }
+  const expense = await Expense.findOne({ where: { name: trimmed, status: 'active' } });
+  if (!expense) {
+    throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
+  }
+  return trimmed;
+}
+
 async function create(data, file, userId) {
   if (!file) throw new AppError('SCREENSHOT_REQUIRED', ERROR_CODES.SCREENSHOT_REQUIRED, 400);
 
   const package_id = Number(data.package_id);
   const amountEtb = Number(data.amount);
-  const reason = data.reason;
   const notes = data.notes || null;
 
   if (!package_id || Number.isNaN(amountEtb) || amountEtb <= 0) {
     throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
   }
-  if (!SPENDING_REASONS.includes(reason)) {
-    throw new AppError('VALIDATION_FAILED', ERROR_CODES.VALIDATION_FAILED, 400);
-  }
+
+  const reason = await assertValidReason(data.reason);
 
   const pkg = await TourPackage.findByPk(package_id);
   if (!pkg) throw new AppError('PACKAGE_NOT_FOUND', ERROR_CODES.PACKAGE_NOT_FOUND, 404);
+  if (pkg.status === 'done' || pkg.status === 'settled') {
+    throw new AppError('PACKAGE_ALREADY_DONE', ERROR_CODES.PACKAGE_ALREADY_DONE, 400);
+  }
 
   const rate = await exchangeRateService.requireCurrent();
   const exchange_rate = Number(rate.usd_to_etb);

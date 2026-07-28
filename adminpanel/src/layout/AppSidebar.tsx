@@ -67,6 +67,11 @@ const allNavItems: NavItem[] = [
         roles: ["superAdmin", "officeAdmin"],
       },
       {
+        nameKey: "nav.expenses",
+        path: "/settings/expenses",
+        roles: ["superAdmin", "officeAdmin"],
+      },
+      {
         nameKey: "nav.staff",
         path: "/settings/staff",
         roles: ["superAdmin", "officeAdmin"],
@@ -81,6 +86,11 @@ const allNavItems: NavItem[] = [
       {
         nameKey: "nav.packages",
         path: "/packages",
+        roles: ["superAdmin", "officeAdmin", "employee"],
+      },
+      {
+        nameKey: "nav.packageHistory",
+        path: "/packages/history",
         roles: ["superAdmin", "officeAdmin", "employee"],
       },
       {

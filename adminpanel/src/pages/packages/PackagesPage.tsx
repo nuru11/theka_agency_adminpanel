@@ -7,6 +7,7 @@ import {
   touristApi,
   propertyApi,
   parkApi,
+  expenseApi,
   driversApi,
 } from '../../services/thiqaApi';
 import type {
@@ -14,6 +15,7 @@ import type {
   Tourist,
   Property,
   Park,
+  Expense,
   Driver,
   VehicleType,
 } from '../../types';
@@ -21,8 +23,10 @@ import { Modal } from '../../components/ui/modal';
 import Label from '../../components/form/Label';
 import Input from '../../components/form/input/InputField';
 import Select from '../../components/form/Select';
+import Checkbox from '../../components/form/input/Checkbox';
 import { useAuth } from '../../context/AuthContext';
 import { useSubmitLock } from '../../hooks/useSubmitLock';
+import { getApiErrorMessage } from '../../utils/getApiErrorMessage';
 
 type DayForm = {
   day_number: number;
@@ -33,6 +37,11 @@ type DayForm = {
   driver_id: string;
 };
 
+type SelectedExpenseForm = {
+  expense_id: number;
+  price: string;
+};
+
 type PackageForm = {
   tourist_id: string;
   people_count: string;
@@ -40,6 +49,7 @@ type PackageForm = {
   driver_id: string;
   vehicle_type: VehicleType | '';
   days: DayForm[];
+  expenses: SelectedExpenseForm[];
 };
 
 const emptyDay = (day_number: number): DayForm => ({
@@ -58,20 +68,29 @@ const emptyForm = (): PackageForm => ({
   driver_id: '',
   vehicle_type: '',
   days: [emptyDay(1)],
+  expenses: [],
 });
 
 export default function PackagesPage() {
   const { t, i18n } = useTranslation();
   const { hasRole } = useAuth();
   const isEmployee = hasRole('employee');
+  const canMarkDone = hasRole('superAdmin', 'officeAdmin');
   const [items, setItems] = useState<TourPackage[]>([]);
+  const [error, setError] = useState('');
   const [tourists, setTourists] = useState<Tourist[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [parks, setParks] = useState<Park[]>([]);
+  const [catalogExpenses, setCatalogExpenses] = useState<Expense[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<PackageForm>(emptyForm());
   const { submitting, run } = useSubmitLock();
+
+  const activePackages = useMemo(
+    () => items.filter((pkg) => pkg.status !== 'settled' && pkg.status !== 'done'),
+    [items]
+  );
 
   const vehicleOptions = useMemo(
     () => [
@@ -83,17 +102,19 @@ export default function PackagesPage() {
   );
 
   const load = async () => {
-    const [pkgs, touristRes, propertyRes, parkRes, driverRes] = await Promise.all([
+    const [pkgs, touristRes, propertyRes, parkRes, expenseRes, driverRes] = await Promise.all([
       packageApi.list(),
       touristApi.list(),
       propertyApi.list(),
       parkApi.list(),
+      expenseApi.list(),
       driversApi.list(),
     ]);
     setItems(pkgs.data.data);
     setTourists(touristRes.data.data);
     setProperties(propertyRes.data.data.filter((p) => p.status === 'active'));
     setParks(parkRes.data.data.filter((p) => p.status === 'active'));
+    setCatalogExpenses(expenseRes.data.data.filter((e) => e.status === 'active'));
     setDrivers(driverRes.data.data);
   };
 
@@ -102,13 +123,22 @@ export default function PackagesPage() {
   }, []);
 
   const expectedCost = useMemo(() => {
-    return form.days.reduce(
+    const daysTotal = form.days.reduce(
       (sum, d) => sum + Number(d.accommodation_price || 0) + Number(d.park_price || 0),
       0
     );
-  }, [form.days]);
+    const expensesTotal = form.expenses.reduce((sum, e) => sum + Number(e.price || 0), 0);
+    return daysTotal + expensesTotal;
+  }, [form.days, form.expenses]);
 
-  const touristOptions = tourists.map((item) => ({ value: String(item.id), label: item.name }));
+  const touristOptions = tourists
+    .filter(
+      (t) =>
+        t.status !== 'departed' &&
+        t.status !== 'cancelled' &&
+        !items.some((pkg) => pkg.tourist_id === t.id)
+    )
+    .map((item) => ({ value: String(item.id), label: item.name }));
   const propertyOptions = properties.map((p) => ({
     value: String(p.id),
     label: `${p.name} (${p.city})`,
@@ -176,6 +206,31 @@ export default function PackagesPage() {
     });
   };
 
+  const toggleExpense = (expense: Expense, checked: boolean) => {
+    setForm((prev) => {
+      if (checked) {
+        if (prev.expenses.some((e) => e.expense_id === expense.id)) return prev;
+        return {
+          ...prev,
+          expenses: [...prev.expenses, { expense_id: expense.id, price: String(expense.price ?? 0) }],
+        };
+      }
+      return {
+        ...prev,
+        expenses: prev.expenses.filter((e) => e.expense_id !== expense.id),
+      };
+    });
+  };
+
+  const updateExpensePrice = (expenseId: number, price: string) => {
+    setForm((prev) => ({
+      ...prev,
+      expenses: prev.expenses.map((e) =>
+        e.expense_id === expenseId ? { ...e, price } : e
+      ),
+    }));
+  };
+
   const canSubmit =
     !!form.tourist_id &&
     !!form.driver_id &&
@@ -201,10 +256,26 @@ export default function PackagesPage() {
           accommodation_price: Number(d.accommodation_price || 0),
           driver_id: Number(d.driver_id),
         })),
+        expenses: form.expenses.map((e) => ({
+          expense_id: e.expense_id,
+          price: Number(e.price || 0),
+        })),
       });
       closeModal();
       await load();
     });
+  };
+
+  const handleMarkDone = async (pkg: TourPackage) => {
+    const name = pkg.tourist?.name || `#${pkg.tourist_id}`;
+    if (!window.confirm(t('packages.confirmMarkDone', { name }))) return;
+    setError('');
+    try {
+      await packageApi.markDone(pkg.id);
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, t, 'packages.markDoneError'));
+    }
   };
 
   return (
@@ -217,6 +288,8 @@ export default function PackagesPage() {
         </Button>
       }
     >
+      {error ? <p className="mb-4 text-sm text-error-500">{error}</p> : null}
+
       <DataTable
         headers={[
           t('common.tourist'),
@@ -225,15 +298,12 @@ export default function PackagesPage() {
           t('packages.expectedCost'),
           ...(isEmployee
             ? []
-            : [
-                t('packages.actualSpend'),
-                t('packages.amountReceived'),
-                t('packages.variance'),
-              ]),
+            : [t('packages.actualSpend'), t('packages.amountReceived')]),
           t('common.status'),
           t('packages.createdBy'),
+          ...(canMarkDone ? [t('common.actions')] : []),
         ]}
-        rows={items.map((pkg) => [
+        rows={activePackages.map((pkg) => [
           pkg.tourist?.name || `#${pkg.tourist_id}`,
           String(pkg.people_count),
           String(pkg.days_count),
@@ -243,10 +313,21 @@ export default function PackagesPage() {
             : [
                 formatCurrency(Number(pkg.actual_spend || 0), 'ETB'),
                 formatCurrency(Number(pkg.tourist?.amount_received || 0)),
-                formatCurrency(Number(pkg.variance || 0)),
               ]),
           pkg.status,
           pkg.creator?.name || t('common.emDash'),
+          ...(canMarkDone
+            ? [
+                <Button
+                  key={pkg.id}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleMarkDone(pkg)}
+                >
+                  {t('packages.markDone')}
+                </Button>,
+              ]
+            : []),
         ])}
       />
 
@@ -393,6 +474,41 @@ export default function PackagesPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-medium">{t('packages.expenses')}</h3>
+            {catalogExpenses.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t('packages.noExpenses')}</p>
+            ) : (
+              <div className="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                {catalogExpenses.map((expense) => {
+                  const selected = form.expenses.find((e) => e.expense_id === expense.id);
+                  return (
+                    <div key={expense.id} className="space-y-2">
+                      <Checkbox
+                        id={`expense-${expense.id}`}
+                        checked={!!selected}
+                        label={`${expense.name} (${formatCurrency(Number(expense.price), 'ETB')})`}
+                        onChange={(checked) => toggleExpense(expense, checked)}
+                      />
+                      {selected && !isEmployee && (
+                        <div className="ps-8">
+                          <Label>{t('packages.expensePrice')}</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step={0.01}
+                            value={selected.price}
+                            onChange={(e) => updateExpensePrice(expense.id, e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <Button type="submit" size="sm" disabled={!canSubmit || submitting}>

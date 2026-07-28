@@ -17,8 +17,10 @@ const User = require('./User')(sequelize);
 const Tourist = require('./Tourist')(sequelize);
 const Property = require('./Property')(sequelize);
 const Park = require('./Park')(sequelize);
+const Expense = require('./Expense')(sequelize);
 const TourPackage = require('./TourPackage')(sequelize);
 const PackageDay = require('./PackageDay')(sequelize);
+const PackageExpense = require('./PackageExpense')(sequelize);
 const Handoff = require('./Handoff')(sequelize);
 const WalletTransaction = require('./WalletTransaction')(sequelize);
 const PackageSpending = require('./PackageSpending')(sequelize);
@@ -44,6 +46,11 @@ PackageDay.belongsTo(Park, { as: 'park', foreignKey: 'park_id' });
 PackageDay.belongsTo(Property, { as: 'property', foreignKey: 'property_id' });
 Property.hasMany(PackageDay, { as: 'packageDays', foreignKey: 'property_id' });
 PackageDay.belongsTo(User, { as: 'driver', foreignKey: 'driver_id' });
+
+TourPackage.hasMany(PackageExpense, { as: 'expenses', foreignKey: 'package_id' });
+PackageExpense.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });
+PackageExpense.belongsTo(Expense, { as: 'expense', foreignKey: 'expense_id' });
+Expense.hasMany(PackageExpense, { as: 'packageExpenses', foreignKey: 'expense_id' });
 
 Handoff.belongsTo(TourPackage, { as: 'package', foreignKey: 'package_id' });
 TourPackage.hasMany(Handoff, { as: 'handoffs', foreignKey: 'package_id' });
@@ -94,8 +101,10 @@ module.exports = {
   Tourist,
   Property,
   Park,
+  Expense,
   TourPackage,
   PackageDay,
+  PackageExpense,
   Handoff,
   WalletTransaction,
   PackageSpending,

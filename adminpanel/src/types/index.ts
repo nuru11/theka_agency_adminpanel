@@ -50,6 +50,20 @@ export interface Park {
   status: MasterStatus;
 }
 
+export interface Expense {
+  id: number;
+  name: string;
+  price: number;
+  status: MasterStatus;
+}
+
+export interface PackageExpense {
+  id?: number;
+  expense_id: number;
+  price: number;
+  expense?: { id: number; name: string; price?: number };
+}
+
 export type VehicleType = 'van' | 'bus' | 'vip';
 
 export type PackageStatus =
@@ -58,7 +72,8 @@ export type PackageStatus =
   | 'ready_for_handoff'
   | 'sent_to_accountant'
   | 'accountant_received'
-  | 'settled';
+  | 'settled'
+  | 'done';
 
 export interface Driver {
   id: number;
@@ -105,6 +120,7 @@ export interface TourPackage {
   driver?: { id: number; name: string };
   creator?: { id: number; name: string };
   days?: PackageDay[];
+  expenses?: PackageExpense[];
   spendings?: PackageSpending[];
 }
 
@@ -121,6 +137,10 @@ export interface CreatePackagePayload {
     property_id: number;
     accommodation_price: number;
     driver_id: number;
+  }>;
+  expenses?: Array<{
+    expense_id: number;
+    price: number;
   }>;
 }
 
@@ -211,7 +231,8 @@ export interface FundReturn {
   receiver?: { id: number; name: string } | null;
 }
 
-export type SpendingReason = 'accommodation' | 'park' | 'food' | 'other';
+export type BuiltinSpendingReason = 'accommodation' | 'park' | 'food' | 'other';
+export type SpendingReason = string;
 
 export interface PackageSpending {
   id: number;
@@ -232,7 +253,7 @@ export interface PackageSpending {
   creator?: { id: number; name: string };
 }
 
-export type ExpenseByReason = Record<SpendingReason, number>;
+export type ExpenseByReason = Record<BuiltinSpendingReason, number>;
 
 export interface MonthlyAnalysisTouristRow {
   tourist_id: number;

@@ -4,6 +4,7 @@ import type {
   Tourist,
   Property,
   Park,
+  Expense,
   Driver,
   TourPackage,
   CreatePackagePayload,
@@ -51,6 +52,15 @@ export const parkApi = {
   remove: (id: number) => api.delete<{ success: boolean; message: string }>(`/parks/${id}`),
 };
 
+export const expenseApi = {
+  list: () => api.get<{ success: boolean; data: Expense[] }>('/expenses'),
+  get: (id: number) => api.get<{ success: boolean; data: Expense }>(`/expenses/${id}`),
+  create: (data: Partial<Expense>) => api.post<{ success: boolean; data: Expense }>('/expenses', data),
+  update: (id: number, data: Partial<Expense>) =>
+    api.put<{ success: boolean; data: Expense }>(`/expenses/${id}`, data),
+  remove: (id: number) => api.delete<{ success: boolean; message: string }>(`/expenses/${id}`),
+};
+
 export const driversApi = {
   list: () => api.get<{ success: boolean; data: Driver[] }>('/users/drivers'),
 };
@@ -89,6 +99,8 @@ export const packageApi = {
       success: boolean;
       data: { package: TourPackage; fund_return: FundReturn | null };
     }>(`/packages/${id}/settle`, data),
+  markDone: (id: number) =>
+    api.post<{ success: boolean; data: TourPackage }>(`/packages/${id}/done`),
 };
 
 export const handoffApi = {

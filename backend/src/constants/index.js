@@ -16,6 +16,7 @@ const PACKAGE_STATUSES = [
   'sent_to_accountant',
   'accountant_received',
   'settled',
+  'done',
 ];
 
 const HANDOFF_STATUSES = ['pending', 'received'];

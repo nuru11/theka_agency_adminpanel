@@ -8,10 +8,11 @@ import Input from '../../components/form/input/InputField';
 import Select from '../../components/form/Select';
 import TextArea from '../../components/form/input/TextArea';
 import FileInput from '../../components/form/input/FileInput';
-import { packageSpendingApi, packageApi, walletApi, exchangeRateApi } from '../../services/thiqaApi';
+import { packageSpendingApi, packageApi, walletApi, exchangeRateApi, expenseApi } from '../../services/thiqaApi';
 import type {
   PackageSpending,
   TourPackage,
+  Expense,
   SpendingReason,
   WalletSummary,
   ExchangeRate,
@@ -41,6 +42,7 @@ export default function PackageSpendingPage() {
 
   const [items, setItems] = useState<PackageSpending[]>([]);
   const [packages, setPackages] = useState<TourPackage[]>([]);
+  const [catalogExpenses, setCatalogExpenses] = useState<Expense[]>([]);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -58,8 +60,12 @@ export default function PackageSpendingPage() {
       { value: 'park', label: t('spending.reasonPark') },
       { value: 'food', label: t('spending.reasonFood') },
       { value: 'other', label: t('spending.reasonOther') },
+      ...catalogExpenses.map((expense) => ({
+        value: expense.name,
+        label: expense.name,
+      })),
     ],
-    [t]
+    [t, catalogExpenses]
   );
 
   const reasonLabel = (reason: string) => {
@@ -73,12 +79,14 @@ export default function PackageSpendingPage() {
   };
 
   const load = async () => {
-    const [spendingsRes, packagesRes] = await Promise.all([
+    const [spendingsRes, packagesRes, expenseRes] = await Promise.all([
       packageSpendingApi.list(),
       packageApi.list(),
+      expenseApi.list(),
     ]);
     setItems(spendingsRes.data.data);
     setPackages(packagesRes.data.data);
+    setCatalogExpenses(expenseRes.data.data.filter((e) => e.status === 'active'));
 
     if (isAccountant) {
       try {
@@ -118,7 +126,11 @@ export default function PackageSpendingPage() {
       ? Math.round((Number(form.amount) / usdToEtb) * 100) / 100
       : 0;
 
-  const packageOptions = packages.map((p) => ({
+  const activePackages = packages.filter(
+    (p) => p.status !== 'done' && p.status !== 'settled'
+  );
+
+  const packageOptions = activePackages.map((p) => ({
     value: String(p.id),
     label: t('spending.packageOption', {
       id: p.id,

@@ -44,6 +44,13 @@ const parkValidation = [
   validate,
 ];
 
+const expenseValidation = [
+  body('name').notEmpty().withMessage('VALIDATION_NAME_REQUIRED'),
+  body('price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
+  body('status').optional().isIn(MASTER_STATUSES).withMessage('VALIDATION_FAILED'),
+  validate,
+];
+
 const packageValidation = [
   body('tourist_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('people_count').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
@@ -57,6 +64,9 @@ const packageValidation = [
   body('days.*.property_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
   body('days.*.accommodation_price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
   body('days.*.driver_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('expenses').optional().isArray().withMessage('VALIDATION_FAILED'),
+  body('expenses.*.expense_id').isInt({ min: 1 }).withMessage('VALIDATION_FAILED'),
+  body('expenses.*.price').isFloat({ min: 0 }).withMessage('VALIDATION_FAILED'),
   validate,
 ];
 
@@ -126,6 +136,7 @@ module.exports = {
   touristValidation,
   propertyValidation,
   parkValidation,
+  expenseValidation,
   packageValidation,
   handoffValidation,
   exchangeRateValidation,

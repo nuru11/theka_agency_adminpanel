@@ -9,8 +9,10 @@ import TouristsPage from "./pages/tourists/TouristsPage";
 import TouristHistoryPage from "./pages/tourists/TouristHistoryPage";
 import PropertiesPage from "./pages/settings/PropertiesPage";
 import ParksPage from "./pages/settings/ParksPage";
+import ExpensesPage from "./pages/settings/ExpensesPage";
 import StaffPage from "./pages/settings/StaffPage";
 import PackagesPage from "./pages/packages/PackagesPage";
+import PackageHistoryPage from "./pages/packages/PackageHistoryPage";
 import HandoffsPage from "./pages/handoffs/HandoffsPage";
 import ReceivedPage from "./pages/handoffs/ReceivedPage";
 import FundReturnsPage from "./pages/handoffs/FundReturnsPage";
@@ -34,11 +36,13 @@ export default function App() {
               <Route path="/tourists" element={<TouristsPage />} />
               <Route path="/tourists/history" element={<TouristHistoryPage />} />
               <Route path="/packages" element={<PackagesPage />} />
+              <Route path="/packages/history" element={<PackageHistoryPage />} />
             </Route>
 
             <Route element={<ProtectedRoute roles={["superAdmin", "officeAdmin"]} />}>
               <Route path="/settings/properties" element={<PropertiesPage />} />
               <Route path="/settings/parks" element={<ParksPage />} />
+              <Route path="/settings/expenses" element={<ExpensesPage />} />
               <Route path="/settings/staff" element={<StaffPage />} />
               <Route path="/handoffs" element={<HandoffsPage />} />
             </Route>
